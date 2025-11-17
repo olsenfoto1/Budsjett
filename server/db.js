@@ -1,0 +1,240 @@
+const fs = require('fs');
+const path = require('path');
+
+const dataDir = path.join(__dirname, 'data');
+if (!fs.existsSync(dataDir)) {
+  fs.mkdirSync(dataDir, { recursive: true });
+}
+const dataPath = path.join(dataDir, 'store.json');
+
+const defaultData = {
+  categories: [],
+  pages: [],
+  transactions: [],
+  counters: {
+    categories: 0,
+    pages: 0,
+    transactions: 0
+  }
+};
+
+class Store {
+  constructor() {
+    this.state = this.load();
+    this.ensureDefaults();
+  }
+
+  getState() {
+    return this.state;
+  }
+
+  load() {
+    if (!fs.existsSync(dataPath)) {
+      return JSON.parse(JSON.stringify(defaultData));
+    }
+    try {
+      const raw = fs.readFileSync(dataPath, 'utf8');
+      return JSON.parse(raw);
+    } catch (error) {
+      console.error('Klarte ikke å lese lagringsfil, bruker default.', error);
+      return JSON.parse(JSON.stringify(defaultData));
+    }
+  }
+
+  save() {
+    fs.writeFileSync(dataPath, JSON.stringify(this.state, null, 2));
+  }
+
+  ensureDefaults() {
+    if (!this.state.categories.length) {
+      const defaults = [
+        { name: 'Lønn', type: 'income', color: '#22c55e', description: 'Inntekter og lønn' },
+        { name: 'Abonnementer', type: 'expense', color: '#6366f1', description: 'Faste abonnementer' },
+        { name: 'Lån', type: 'expense', color: '#f97316', description: 'Lån og kreditt' },
+        { name: 'Sparing', type: 'expense', color: '#14b8a6', description: 'Sparing og investering' }
+      ];
+      defaults.forEach((cat) => this.addCategory(cat));
+    }
+  }
+
+  nextId(key) {
+    this.state.counters[key] = (this.state.counters[key] || 0) + 1;
+    return this.state.counters[key];
+  }
+
+  getCategories() {
+    return this.state.categories;
+  }
+
+  addCategory(payload) {
+    const category = {
+      id: payload.id ?? this.nextId('categories'),
+      name: payload.name,
+      type: payload.type || 'expense',
+      color: payload.color || '#4f46e5',
+      description: payload.description || ''
+    };
+    const existingIdx = this.state.categories.findIndex((cat) => cat.id === category.id);
+    if (existingIdx >= 0) {
+      this.state.categories[existingIdx] = category;
+    } else {
+      this.state.categories.push(category);
+    }
+    this.save();
+    return category;
+  }
+
+  updateCategory(id, payload) {
+    const index = this.state.categories.findIndex((cat) => cat.id === Number(id));
+    if (index === -1) return null;
+    this.state.categories[index] = { ...this.state.categories[index], ...payload };
+    this.save();
+    return this.state.categories[index];
+  }
+
+  deleteCategory(id) {
+    const categoryId = Number(id);
+    this.state.transactions = this.state.transactions.map((tx) =>
+      tx.categoryId === categoryId ? { ...tx, categoryId: null } : tx
+    );
+    const originalLength = this.state.categories.length;
+    this.state.categories = this.state.categories.filter((cat) => cat.id !== categoryId);
+    this.save();
+    return originalLength !== this.state.categories.length;
+  }
+
+  getPages() {
+    return this.state.pages;
+  }
+
+  addPage(payload) {
+    const page = {
+      id: payload.id ?? this.nextId('pages'),
+      name: payload.name,
+      description: payload.description || '',
+      color: payload.color || '#059669',
+      metadata: payload.metadata || {}
+    };
+    const existingIdx = this.state.pages.findIndex((p) => p.id === page.id);
+    if (existingIdx >= 0) {
+      this.state.pages[existingIdx] = page;
+    } else {
+      this.state.pages.push(page);
+    }
+    this.save();
+    return page;
+  }
+
+  updatePage(id, payload) {
+    const index = this.state.pages.findIndex((p) => p.id === Number(id));
+    if (index === -1) return null;
+    this.state.pages[index] = { ...this.state.pages[index], ...payload };
+    this.save();
+    return this.state.pages[index];
+  }
+
+  deletePage(id) {
+    const pageId = Number(id);
+    this.state.transactions = this.state.transactions.map((tx) =>
+      tx.pageId === pageId ? { ...tx, pageId: null } : tx
+    );
+    const originalLength = this.state.pages.length;
+    this.state.pages = this.state.pages.filter((p) => p.id !== pageId);
+    this.save();
+    return originalLength !== this.state.pages.length;
+  }
+
+  getTransactions() {
+    return this.state.transactions;
+  }
+
+  addTransaction(payload) {
+    const transaction = {
+      id: payload.id ?? this.nextId('transactions'),
+      title: payload.title,
+      amount: Number(payload.amount),
+      type: payload.type,
+      categoryId: payload.categoryId ?? null,
+      pageId: payload.pageId ?? null,
+      tags: payload.tags || [],
+      occurredOn: payload.occurredOn,
+      notes: payload.notes || '',
+      metadata: payload.metadata || {}
+    };
+    const existingIdx = this.state.transactions.findIndex((tx) => tx.id === transaction.id);
+    if (existingIdx >= 0) {
+      this.state.transactions[existingIdx] = transaction;
+    } else {
+      this.state.transactions.push(transaction);
+    }
+    this.save();
+    return transaction;
+  }
+
+  updateTransaction(id, payload) {
+    const index = this.state.transactions.findIndex((tx) => tx.id === Number(id));
+    if (index === -1) return null;
+    this.state.transactions[index] = {
+      ...this.state.transactions[index],
+      ...payload,
+      amount: Number(payload.amount ?? this.state.transactions[index].amount)
+    };
+    this.save();
+    return this.state.transactions[index];
+  }
+
+  deleteTransaction(id) {
+    const transactionId = Number(id);
+    const originalLength = this.state.transactions.length;
+    this.state.transactions = this.state.transactions.filter((tx) => tx.id !== transactionId);
+    this.save();
+    return originalLength !== this.state.transactions.length;
+  }
+
+  replaceAll(data) {
+    const categories = (data.categories || []).map((cat, index) => ({
+      id: cat.id ?? index + 1,
+      name: cat.name,
+      type: cat.type || 'expense',
+      color: cat.color || '#4f46e5',
+      description: cat.description || ''
+    }));
+
+    const pages = (data.pages || []).map((page, index) => ({
+      id: page.id ?? index + 1,
+      name: page.name,
+      description: page.description || '',
+      color: page.color || '#059669',
+      metadata: page.metadata || {}
+    }));
+
+    const transactions = (data.transactions || []).map((tx, index) => ({
+      id: tx.id ?? index + 1,
+      title: tx.title,
+      amount: Number(tx.amount) || 0,
+      type: tx.type || 'expense',
+      categoryId: tx.categoryId ?? tx.category_id ?? null,
+      pageId: tx.pageId ?? tx.page_id ?? null,
+      tags: tx.tags || [],
+      occurredOn: tx.occurredOn || tx.occurred_on || new Date().toISOString().slice(0, 10),
+      notes: tx.notes || '',
+      metadata: tx.metadata || {}
+    }));
+
+    const counters = data.counters || {
+      categories: Math.max(0, ...categories.map((c) => c.id || 0)),
+      pages: Math.max(0, ...pages.map((p) => p.id || 0)),
+      transactions: Math.max(0, ...transactions.map((t) => t.id || 0))
+    };
+
+    this.state = {
+      categories,
+      pages,
+      transactions,
+      counters
+    };
+    this.save();
+  }
+}
+
+module.exports = new Store();
