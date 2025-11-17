@@ -141,6 +141,51 @@ main {
   gap: 1.5rem;
 }
 
+.transactions-page {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.transactions-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 380px) 1fr;
+  gap: 1.5rem;
+  align-items: flex-start;
+}
+
+@media (max-width: 1024px) {
+  .transactions-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.transaction-form-card form {
+  margin-top: 1rem;
+}
+
+.form-row {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.form-row > * {
+  flex: 1;
+  min-width: 140px;
+}
+
+.transaction-filters-card {
+  min-height: 100%;
+}
+
+.filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
 .card {
   background: linear-gradient(145deg, var(--surface), var(--surface-alt));
   border-radius: 1.5rem;
@@ -251,8 +296,28 @@ textarea {
   gap: 0.75rem;
 }
 
+.section-header.compact {
+  margin: 0 0 0.5rem;
+}
+
 .section-header h2 {
   margin: 0;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.panel-header h2,
+.panel-header h3 {
+  margin: 0;
+}
+
+.panel-header .muted {
+  margin-top: 0.35rem;
 }
 
 .stat {
@@ -379,17 +444,25 @@ textarea {
 
 .inline-form {
   display: flex;
-  gap: 0.5rem;
-  align-items: center;
-  margin-bottom: 0.5rem;
+  flex-direction: column;
+  gap: 0.65rem;
+  align-items: stretch;
 }
 
 .inline-form input {
   flex: 1;
+  width: 100%;
 }
 
 .inline-form button {
   white-space: nowrap;
+  align-self: flex-start;
+}
+
+.inline-form label {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
 }
 
 @media (max-width: 640px) {
@@ -422,6 +495,10 @@ textarea {
   font-size: 0.75rem;
   margin-right: 0.25rem;
   margin-bottom: 0.2rem;
+}
+
+.table-section .table-wrapper {
+  margin-top: 0.75rem;
 }
 
 .page-card {

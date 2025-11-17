@@ -102,12 +102,24 @@ const DashboardPage = () => {
           <p className="muted">{summary.fixedExpensesCount} aktive avtaler</p>
         </div>
         <div className="card">
-          <h3>Netto inntekt per måned</h3>
+          <div className="panel-header">
+            <div>
+              <h3>Netto inntekt per måned</h3>
+              <p className="muted">Brukes som utgangspunkt for oversikten.</p>
+            </div>
+            {statusMessage && <span className="badge">{statusMessage}</span>}
+          </div>
           <form className="inline-form" onSubmit={handleIncomeSubmit}>
-            <input type="number" min="0" value={incomeInput} onChange={(e) => setIncomeInput(e.target.value)} />
+            <label htmlFor="monthlyNetIncome">Beløp (NOK)</label>
+            <input
+              id="monthlyNetIncome"
+              type="number"
+              min="0"
+              value={incomeInput}
+              onChange={(e) => setIncomeInput(e.target.value)}
+            />
             <button type="submit">Oppdater</button>
           </form>
-          {statusMessage && <small className="muted">{statusMessage}</small>}
         </div>
         <div className="card">
           <h3>Ledig etter faste kostnader</h3>
