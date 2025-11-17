@@ -24,6 +24,11 @@ export const api = {
     request(`/transactions/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
   deleteTransaction: (id) => request(`/transactions/${id}`, { method: 'DELETE' }),
 
+  getFixedExpenses: () => request('/faste-utgifter'),
+  createFixedExpense: (payload) => request('/faste-utgifter', { method: 'POST', body: JSON.stringify(payload) }),
+  updateFixedExpense: (id, payload) => request(`/faste-utgifter/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  deleteFixedExpense: (id) => request(`/faste-utgifter/${id}`, { method: 'DELETE' }),
+
   getCategories: () => request('/categories'),
   createCategory: (payload) => request('/categories', { method: 'POST', body: JSON.stringify(payload) }),
   updateCategory: (id, payload) => request(`/categories/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
@@ -33,6 +38,9 @@ export const api = {
   createPage: (payload) => request('/pages', { method: 'POST', body: JSON.stringify(payload) }),
   updatePage: (id, payload) => request(`/pages/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
   deletePage: (id) => request(`/pages/${id}`, { method: 'DELETE' }),
+
+  getSettings: () => request('/settings'),
+  updateSettings: (payload) => request('/settings', { method: 'PUT', body: JSON.stringify(payload) }),
 
   exportData: () => request('/export'),
   importData: (payload) => request('/import', { method: 'POST', body: JSON.stringify(payload) })

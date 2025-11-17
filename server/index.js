@@ -4,6 +4,9 @@ const path = require('path');
 const fs = require('fs');
 const db = require('./db');
 
+const FIXED_EXPENSE_CATEGORIES = ['Abonnement', 'Lån', 'Forsikring', 'Strøm', 'Annet'];
+const FIXED_EXPENSE_LEVELS = ['Må-ha', 'Kjekt å ha', 'Luksus'];
+
 const app = express();
 const PORT = process.env.PORT || 4173;
 
@@ -20,6 +23,20 @@ const enrichTransaction = (tx) => {
     categoryName: category?.name,
     pageName: page?.name
   };
+};
+
+const normalizeOwnersInput = (owners) => {
+  if (!owners) return [];
+  if (Array.isArray(owners)) {
+    return owners.map((owner) => String(owner).trim()).filter(Boolean);
+  }
+  if (typeof owners === 'string') {
+    return owners
+      .split(',')
+      .map((owner) => owner.trim())
+      .filter(Boolean);
+  }
+  return [];
 };
 
 app.get('/api/categories', (req, res) => {
@@ -164,10 +181,109 @@ app.delete('/api/transactions/:id', (req, res) => {
   res.json({ deleted: removed });
 });
 
+app.get('/api/faste-utgifter', (req, res) => {
+  res.json(db.getFixedExpenses());
+});
+
+app.post('/api/faste-utgifter', (req, res) => {
+  const {
+    name,
+    amountPerMonth,
+    category = 'Annet',
+    owners = [],
+    level = 'Må-ha',
+    startDate = '',
+    bindingEndDate = '',
+    noticePeriodMonths = null,
+    note = ''
+  } = req.body;
+
+  if (!name) return res.status(400).json({ error: 'Navn er påkrevd.' });
+  if (amountPerMonth === undefined || Number.isNaN(Number(amountPerMonth))) {
+    return res.status(400).json({ error: 'Beløp per måned må være et tall.' });
+  }
+  if (!FIXED_EXPENSE_CATEGORIES.includes(category)) {
+    return res.status(400).json({ error: 'Ugyldig kategori.' });
+  }
+  if (!FIXED_EXPENSE_LEVELS.includes(level)) {
+    return res.status(400).json({ error: 'Ugyldig nivå.' });
+  }
+  const noticeValue =
+    noticePeriodMonths === null || noticePeriodMonths === ''
+      ? null
+      : Number(noticePeriodMonths);
+  if (noticeValue !== null && Number.isNaN(noticeValue)) {
+    return res.status(400).json({ error: 'Oppsigelsestid må være et tall eller tom.' });
+  }
+
+  const expense = db.addFixedExpense({
+    name,
+    amountPerMonth,
+    category,
+    owners: normalizeOwnersInput(owners),
+    level,
+    startDate,
+    bindingEndDate,
+    noticePeriodMonths: noticeValue,
+    note
+  });
+  res.status(201).json(expense);
+});
+
+app.put('/api/faste-utgifter/:id', (req, res) => {
+  const { id } = req.params;
+  const { category, level, noticePeriodMonths, owners } = req.body;
+  if (category && !FIXED_EXPENSE_CATEGORIES.includes(category)) {
+    return res.status(400).json({ error: 'Ugyldig kategori.' });
+  }
+  if (level && !FIXED_EXPENSE_LEVELS.includes(level)) {
+    return res.status(400).json({ error: 'Ugyldig nivå.' });
+  }
+  const update = { ...req.body };
+  if (req.body.amountPerMonth !== undefined && Number.isNaN(Number(req.body.amountPerMonth))) {
+    return res.status(400).json({ error: 'Beløp per måned må være et tall.' });
+  }
+  if (noticePeriodMonths !== undefined) {
+    if (noticePeriodMonths === null || noticePeriodMonths === '') {
+      update.noticePeriodMonths = null;
+    } else if (Number.isNaN(Number(noticePeriodMonths))) {
+      return res.status(400).json({ error: 'Oppsigelsestid må være et tall.' });
+    }
+  }
+  if (owners !== undefined) {
+    update.owners = normalizeOwnersInput(owners);
+  }
+  const updated = db.updateFixedExpense(id, update);
+  if (!updated) return res.status(404).json({ error: 'Fast utgift ikke funnet' });
+  res.json(updated);
+});
+
+app.delete('/api/faste-utgifter/:id', (req, res) => {
+  const { id } = req.params;
+  const deleted = db.deleteFixedExpense(id);
+  res.json({ deleted });
+});
+
+app.get('/api/settings', (req, res) => {
+  res.json(db.getSettings());
+});
+
+app.put('/api/settings', (req, res) => {
+  const { monthlyNetIncome = 0 } = req.body;
+  const value = Number(monthlyNetIncome);
+  if (!Number.isFinite(value) || value < 0) {
+    return res.status(400).json({ error: 'Netto inntekt må være et ikke-negativt tall.' });
+  }
+  const updated = db.updateSettings({ monthlyNetIncome: value });
+  res.json(updated);
+});
+
 app.get('/api/dashboard', (req, res) => {
   const transactions = db.getTransactions();
   const categories = db.getCategories();
   const pages = db.getPages();
+  const fixedExpenses = db.getFixedExpenses();
+  const settings = db.getSettings();
 
   const totalIncome = transactions
     .filter((tx) => tx.type === 'income')
@@ -175,6 +291,50 @@ app.get('/api/dashboard', (req, res) => {
   const totalExpense = transactions
     .filter((tx) => tx.type === 'expense')
     .reduce((sum, tx) => sum + tx.amount, 0);
+
+  const fixedExpenseTotal = fixedExpenses.reduce((sum, expense) => sum + (expense.amountPerMonth || 0), 0);
+
+  const fixedCategoryTotalsMap = {};
+  fixedExpenses.forEach((expense) => {
+    const key = expense.category || 'Annet';
+    if (!fixedCategoryTotalsMap[key]) fixedCategoryTotalsMap[key] = 0;
+    fixedCategoryTotalsMap[key] += expense.amountPerMonth || 0;
+  });
+  const fixedExpenseCategoryTotals = Object.entries(fixedCategoryTotalsMap)
+    .map(([category, total]) => ({ category, total }))
+    .sort((a, b) => b.total - a.total);
+
+  const fixedLevelTotalsMap = {};
+  fixedExpenses.forEach((expense) => {
+    const key = expense.level || 'Må-ha';
+    if (!fixedLevelTotalsMap[key]) fixedLevelTotalsMap[key] = 0;
+    fixedLevelTotalsMap[key] += expense.amountPerMonth || 0;
+  });
+  const fixedExpenseLevelTotals = Object.entries(fixedLevelTotalsMap)
+    .map(([level, total]) => ({ level, total }))
+    .sort((a, b) => b.total - a.total);
+
+  const now = Date.now();
+  const ninetyDays = 90 * 24 * 60 * 60 * 1000;
+  const bindingExpirations = fixedExpenses
+    .filter((expense) => expense.bindingEndDate)
+    .map((expense) => {
+      const bindingTime = new Date(expense.bindingEndDate).getTime();
+      const daysLeft = Math.ceil((bindingTime - now) / (1000 * 60 * 60 * 24));
+      return {
+        id: expense.id,
+        name: expense.name,
+        bindingEndDate: expense.bindingEndDate,
+        category: expense.category,
+        amountPerMonth: expense.amountPerMonth,
+        daysLeft
+      };
+    })
+    .filter((item) => item.daysLeft >= 0 && item.daysLeft <= 90)
+    .sort((a, b) => new Date(a.bindingEndDate) - new Date(b.bindingEndDate));
+
+  const monthlyNetIncome = Number(settings.monthlyNetIncome) || 0;
+  const freeAfterFixed = monthlyNetIncome - fixedExpenseTotal;
 
   const categoryTotals = categories.map((category) => ({
     ...category,
@@ -226,7 +386,14 @@ app.get('/api/dashboard', (req, res) => {
     categoryTotals,
     monthly,
     tagTotals,
-    pageBalances
+    pageBalances,
+    fixedExpenseTotal,
+    fixedExpenseCategoryTotals,
+    fixedExpenseLevelTotals,
+    monthlyNetIncome,
+    freeAfterFixed,
+    bindingExpirations,
+    fixedExpensesCount: fixedExpenses.length
   });
 });
 
@@ -236,6 +403,8 @@ app.get('/api/export', (req, res) => {
     categories: state.categories,
     pages: state.pages,
     transactions: state.transactions,
+    fixedExpenses: state.fixedExpenses || [],
+    settings: state.settings || {},
     counters: state.counters
   };
   res.json(payload);
@@ -243,11 +412,13 @@ app.get('/api/export', (req, res) => {
 
 app.post('/api/import', (req, res) => {
   try {
-    const { categories = [], pages = [], transactions = [], counters = null } = req.body;
+    const { categories = [], pages = [], transactions = [], fixedExpenses = [], settings = {}, counters = null } = req.body;
     const payload = {
       categories,
       pages,
       transactions,
+      fixedExpenses,
+      settings,
       counters: counters || undefined
     };
     db.replaceAll(payload);
