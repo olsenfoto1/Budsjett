@@ -6,20 +6,20 @@ import { formatCurrency, formatDate, formatNotice } from '../utils/format.js';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
-const CATEGORY_OPTIONS = ['Abonnement', 'Lån', 'Forsikring', 'Strøm', 'Annet'];
+const FALLBACK_CATEGORY_OPTIONS = ['Abonnement', 'Lån', 'Forsikring', 'Strøm', 'Annet'];
 const LEVEL_OPTIONS = ['Må-ha', 'Kjekt å ha', 'Luksus'];
 
-const emptyForm = {
+const createEmptyForm = (category = FALLBACK_CATEGORY_OPTIONS[0]) => ({
   name: '',
   amountPerMonth: '',
-  category: CATEGORY_OPTIONS[0],
+  category,
   owners: '',
   level: LEVEL_OPTIONS[0],
   startDate: '',
   bindingEndDate: '',
   noticePeriodMonths: '',
   note: ''
-};
+});
 
 const Modal = ({ children, onClose }) => (
   <div className="modal-overlay" role="dialog" aria-modal="true">
@@ -34,12 +34,19 @@ const Modal = ({ children, onClose }) => (
 
 const FixedExpensesPage = () => {
   const [expenses, setExpenses] = useState([]);
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState(() => createEmptyForm());
   const [editingId, setEditingId] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState('');
   const [simulatedExpense, setSimulatedExpense] = useState(null);
   const [selectedOwner, setSelectedOwner] = useState(null);
+  const [categoryOptions, setCategoryOptions] = useState(FALLBACK_CATEGORY_OPTIONS);
+  const availableCategories = useMemo(() => {
+    if (!form.category || categoryOptions.includes(form.category)) {
+      return categoryOptions;
+    }
+    return [form.category, ...categoryOptions];
+  }, [categoryOptions, form.category]);
 
   const fetchExpenses = async () => {
     try {
@@ -52,6 +59,24 @@ const FixedExpensesPage = () => {
 
   useEffect(() => {
     fetchExpenses();
+  }, []);
+
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const categories = await api.getCategories();
+        const expenseCategories = categories
+          .filter((category) => category.type !== 'income')
+          .map((category) => category.name);
+        if (expenseCategories.length) {
+          setCategoryOptions(expenseCategories);
+        }
+      } catch (err) {
+        console.error('Kunne ikke hente kategorier', err);
+      }
+    };
+
+    loadCategories();
   }, []);
 
   const filteredExpenses = useMemo(() => {
@@ -136,7 +161,7 @@ const FixedExpensesPage = () => {
       setForm({
         name: expense.name,
         amountPerMonth: expense.amountPerMonth,
-        category: expense.category,
+        category: expense.category || categoryOptions[0] || FALLBACK_CATEGORY_OPTIONS[0],
         owners: (expense.owners || []).join(', '),
         level: expense.level,
         startDate: expense.startDate || '',
@@ -146,14 +171,14 @@ const FixedExpensesPage = () => {
       });
     } else {
       setEditingId(null);
-      setForm(emptyForm);
+      setForm(createEmptyForm(categoryOptions[0] || FALLBACK_CATEGORY_OPTIONS[0]));
     }
     setShowForm(true);
   };
 
   const closeForm = () => {
     setShowForm(false);
-    setForm(emptyForm);
+    setForm(createEmptyForm(categoryOptions[0] || FALLBACK_CATEGORY_OPTIONS[0]));
     setEditingId(null);
   };
 
@@ -408,7 +433,7 @@ const FixedExpensesPage = () => {
               onChange={(e) => setForm({ ...form, amountPerMonth: e.target.value })}
             />
             <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
-              {CATEGORY_OPTIONS.map((option) => (
+              {availableCategories.map((option) => (
                 <option value={option} key={option}>
                   {option}
                 </option>
