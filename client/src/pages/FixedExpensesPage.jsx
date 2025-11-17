@@ -293,13 +293,12 @@ const FixedExpensesPage = () => {
             {expenses.map((expense) => (
               <tr key={expense.id}>
                 <td>
-                  <strong>{expense.name}</strong>
-                  {expense.startDate && (
-                    <>
-                      <br />
-                      <small className="muted">Startet {formatDate(expense.startDate)}</small>
-                    </>
-                  )}
+                  <div className="table-inline">
+                    <strong>{expense.name}</strong>
+                    {expense.startDate && (
+                      <small className="muted subtle-label">Startet {formatDate(expense.startDate)}</small>
+                    )}
+                  </div>
                 </td>
                 <td>{formatCurrency(expense.amountPerMonth)}</td>
                 <td>{expense.category}</td>

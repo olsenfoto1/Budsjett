@@ -217,6 +217,10 @@ main {
   box-shadow: var(--card-shadow);
 }
 
+.table-wrapper table {
+  min-width: 960px;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
@@ -234,6 +238,19 @@ th {
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--muted);
+  white-space: nowrap;
+}
+
+.table-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.subtle-label {
+  font-size: 0.8rem;
+  white-space: nowrap;
 }
 
 tbody tr:hover {
@@ -564,9 +581,17 @@ textarea {
 .pill-row {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
   padding: 0.35rem 0;
   border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.pill-row > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
 }
 
 .pill-row:last-child {
