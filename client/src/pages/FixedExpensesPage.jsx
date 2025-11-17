@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 import { Doughnut } from 'react-chartjs-2';
 import { api } from '../api.js';
@@ -41,6 +41,8 @@ const FixedExpensesPage = () => {
   const [simulatedExpense, setSimulatedExpense] = useState(null);
   const [selectedOwner, setSelectedOwner] = useState(null);
   const [categoryOptions, setCategoryOptions] = useState(FALLBACK_CATEGORY_OPTIONS);
+  const [categoryError, setCategoryError] = useState('');
+  const [isLoadingCategories, setIsLoadingCategories] = useState(false);
   const availableCategories = useMemo(() => {
     if (!form.category || categoryOptions.includes(form.category)) {
       return categoryOptions;
@@ -61,23 +63,31 @@ const FixedExpensesPage = () => {
     fetchExpenses();
   }, []);
 
-  useEffect(() => {
-    const loadCategories = async () => {
-      try {
-        const categories = await api.getCategories();
-        const expenseCategories = categories
-          .filter((category) => category.type !== 'income')
-          .map((category) => category.name);
-        if (expenseCategories.length) {
-          setCategoryOptions(expenseCategories);
-        }
-      } catch (err) {
-        console.error('Kunne ikke hente kategorier', err);
+  const loadCategories = useCallback(async () => {
+    setIsLoadingCategories(true);
+    setCategoryError('');
+    try {
+      const categories = await api.getCategories();
+      const expenseCategories = categories
+        .filter((category) => category.type !== 'income')
+        .map((category) => category.name);
+      if (expenseCategories.length) {
+        setCategoryOptions(expenseCategories);
+      } else {
+        setCategoryOptions(FALLBACK_CATEGORY_OPTIONS);
       }
-    };
-
-    loadCategories();
+    } catch (err) {
+      console.error('Kunne ikke hente kategorier', err);
+      setCategoryError('Kunne ikke hente oppdaterte kategorier. Viser standardvalg.');
+      setCategoryOptions((current) => (current.length ? current : FALLBACK_CATEGORY_OPTIONS));
+    } finally {
+      setIsLoadingCategories(false);
+    }
   }, []);
+
+  useEffect(() => {
+    loadCategories();
+  }, [loadCategories]);
 
   const filteredExpenses = useMemo(() => {
     if (!selectedOwner) return expenses;
@@ -156,6 +166,8 @@ const FixedExpensesPage = () => {
   }, [categoryTotals]);
 
   const handleOpenForm = (expense) => {
+    // Hent alltid siste kategorier når skjemaet åpnes
+    loadCategories();
     if (expense) {
       setEditingId(expense.id);
       setForm({
@@ -184,10 +196,13 @@ const FixedExpensesPage = () => {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    const normalizedCategory = categoryOptions.includes(form.category)
+      ? form.category
+      : categoryOptions[0] || FALLBACK_CATEGORY_OPTIONS[0];
     const payload = {
       name: form.name,
       amountPerMonth: Number(form.amountPerMonth),
-      category: form.category,
+      category: normalizedCategory,
       owners: form.owners
         ? form.owners
             .split(',')
@@ -432,13 +447,18 @@ const FixedExpensesPage = () => {
               value={form.amountPerMonth}
               onChange={(e) => setForm({ ...form, amountPerMonth: e.target.value })}
             />
-            <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
+            <select
+              value={form.category}
+              onChange={(e) => setForm({ ...form, category: e.target.value })}
+              disabled={isLoadingCategories && !categoryOptions.length}
+            >
               {availableCategories.map((option) => (
                 <option value={option} key={option}>
                   {option}
                 </option>
               ))}
             </select>
+            {categoryError && <p className="error-text">{categoryError}</p>}
             <select value={form.level} onChange={(e) => setForm({ ...form, level: e.target.value })}>
               {LEVEL_OPTIONS.map((option) => (
                 <option value={option} key={option}>
