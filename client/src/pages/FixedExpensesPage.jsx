@@ -350,7 +350,7 @@ const FixedExpensesPage = () => {
               required
               type="number"
               min="0"
-              step="100"
+              step="1"
               placeholder="Beløp per måned"
               value={form.amountPerMonth}
               onChange={(e) => setForm({ ...form, amountPerMonth: e.target.value })}
