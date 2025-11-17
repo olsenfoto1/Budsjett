@@ -10,6 +10,19 @@ const PORT = process.env.PORT || 4173;
 app.use(cors());
 app.use(express.json({ limit: '5mb' }));
 
+const osloMonthFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Europe/Oslo',
+  year: 'numeric',
+  month: '2-digit'
+});
+
+const toOsloMonthPeriod = (value) => {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return osloMonthFormatter.format(date);
+};
+
 const enrichTransaction = (tx) => {
   const categories = db.getCategories();
   const pages = db.getPages();
@@ -185,7 +198,7 @@ app.get('/api/dashboard', (req, res) => {
 
   const monthlyMap = {};
   transactions.forEach((tx) => {
-    const period = tx.occurredOn.slice(0, 7);
+    const period = toOsloMonthPeriod(tx.occurredOn) || tx.occurredOn.slice(0, 7);
     if (!monthlyMap[period]) monthlyMap[period] = { period, income: 0, expenses: 0 };
     if (tx.type === 'income') monthlyMap[period].income += tx.amount;
     else monthlyMap[period].expenses += tx.amount;
