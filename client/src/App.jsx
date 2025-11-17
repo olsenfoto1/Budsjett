@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { NavLink, Route, Routes } from 'react-router-dom';
 import DashboardPage from './pages/DashboardPage.jsx';
-import TransactionsPage from './pages/TransactionsPage.jsx';
+import SavingsGoalsPage from './pages/SavingsGoalsPage.jsx';
 import CategoriesPage from './pages/CategoriesPage.jsx';
 import PagesPage from './pages/PagesPage.jsx';
 import DataPage from './pages/DataPage.jsx';
@@ -40,7 +40,7 @@ const App = () => {
               Oversikt
             </NavLink>
             <NavLink to="/faste-utgifter">Faste utgifter</NavLink>
-            <NavLink to="/transactions">Transaksjoner</NavLink>
+            <NavLink to="/sparemal">Sparemål</NavLink>
             <NavLink to="/categories">Kategorier</NavLink>
             <NavLink to="/data">Import/Export</NavLink>
           </div>
@@ -53,7 +53,7 @@ const App = () => {
         <Routes>
           <Route path="/" element={<DashboardPage />} />
           <Route path="/faste-utgifter" element={<FixedExpensesPage />} />
-          <Route path="/transactions" element={<TransactionsPage />} />
+          <Route path="/sparemal" element={<SavingsGoalsPage />} />
           <Route path="/categories" element={<CategoriesPage />} />
           <Route path="/pages" element={<PagesPage />} />
           <Route path="/data" element={<DataPage />} />
