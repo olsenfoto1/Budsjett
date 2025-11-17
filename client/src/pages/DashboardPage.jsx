@@ -224,19 +224,6 @@ const DashboardPage = () => {
         </>
       )}
 
-      <div className="section-header">
-        <h2>Sider</h2>
-      </div>
-      <div className="card-grid">
-        {summary.pageBalances.map((page) => (
-          <div className="card" key={page.name}>
-            <h3>{page.name}</h3>
-            <p className="stat" style={{ color: page.balance >= 0 ? '#16a34a' : '#dc2626' }}>
-              {page.balance.toLocaleString('no-NO', { style: 'currency', currency: 'NOK' })}
-            </p>
-          </div>
-        ))}
-      </div>
     </div>
   );
 };
