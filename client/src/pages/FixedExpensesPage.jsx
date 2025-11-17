@@ -259,8 +259,8 @@ const FixedExpensesPage = () => {
         <div className="analysis-grid">
           {levelTotals.map((item) => (
             <div key={item.level} className="analysis-item">
-              <span className="muted">{item.level}</span>
-              <strong>{formatCurrency(item.total)}</strong>
+              <span className="analysis-label muted">{item.level}</span>
+              <strong className="analysis-amount">{formatCurrency(item.total)}</strong>
             </div>
           ))}
         </div>

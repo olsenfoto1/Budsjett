@@ -144,8 +144,8 @@ const DashboardPage = () => {
           <h3>Prioritering</h3>
           {fixedLevels.map((item) => (
             <div key={item.level} className="pill-row">
-              <span>{item.level}</span>
-              <strong>{formatCurrency(item.total)}</strong>
+              <span className="pill-label">{item.level}</span>
+              <strong className="pill-value">{formatCurrency(item.total)}</strong>
             </div>
           ))}
         </div>
