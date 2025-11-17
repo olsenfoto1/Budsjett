@@ -39,6 +39,7 @@ const FixedExpensesPage = () => {
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState('');
   const [simulatedExpense, setSimulatedExpense] = useState(null);
+  const [selectedOwner, setSelectedOwner] = useState(null);
 
   const fetchExpenses = async () => {
     try {
@@ -53,35 +54,40 @@ const FixedExpensesPage = () => {
     fetchExpenses();
   }, []);
 
+  const filteredExpenses = useMemo(() => {
+    if (!selectedOwner) return expenses;
+    return expenses.filter((expense) => (expense.owners || []).includes(selectedOwner));
+  }, [expenses, selectedOwner]);
+
   const totalPerMonth = useMemo(
-    () => expenses.reduce((sum, expense) => sum + (Number(expense.amountPerMonth) || 0), 0),
-    [expenses]
+    () => filteredExpenses.reduce((sum, expense) => sum + (Number(expense.amountPerMonth) || 0), 0),
+    [filteredExpenses]
   );
 
   const categoryTotals = useMemo(() => {
     const map = new Map();
-    expenses.forEach((expense) => {
+    filteredExpenses.forEach((expense) => {
       const key = expense.category || 'Annet';
       map.set(key, (map.get(key) || 0) + (expense.amountPerMonth || 0));
     });
     return Array.from(map.entries())
       .map(([category, total]) => ({ category, total }))
       .sort((a, b) => b.total - a.total);
-  }, [expenses]);
+  }, [filteredExpenses]);
 
   const levelTotals = useMemo(() => {
     const map = new Map();
-    expenses.forEach((expense) => {
+    filteredExpenses.forEach((expense) => {
       const key = expense.level || 'Må-ha';
       map.set(key, (map.get(key) || 0) + (expense.amountPerMonth || 0));
     });
     return LEVEL_OPTIONS.map((level) => ({ level, total: map.get(level) || 0 }));
-  }, [expenses]);
+  }, [filteredExpenses]);
 
   const groupedExpenses = useMemo(() => {
-    if (!expenses.length) return [];
+    if (!filteredExpenses.length) return [];
     const map = new Map();
-    expenses.forEach((expense) => {
+    filteredExpenses.forEach((expense) => {
       const key = expense.category || 'Annet';
       const existing = map.get(key) || [];
       existing.push(expense);
@@ -94,12 +100,11 @@ const FixedExpensesPage = () => {
         total: items.reduce((sum, item) => sum + (Number(item.amountPerMonth) || 0), 0)
       }))
       .sort((a, b) => b.total - a.total);
-  }, [expenses]);
+  }, [filteredExpenses]);
 
   const bindingSoon = useMemo(() => {
     const now = Date.now();
-    const ninetyDays = 90 * 24 * 60 * 60 * 1000;
-    return expenses
+    return filteredExpenses
       .filter((expense) => expense.bindingEndDate)
       .map((expense) => {
         const bindingTime = new Date(expense.bindingEndDate).getTime();
@@ -108,7 +113,7 @@ const FixedExpensesPage = () => {
       })
       .filter((item) => item.daysLeft >= 0 && item.daysLeft <= 90)
       .sort((a, b) => new Date(a.bindingEndDate) - new Date(b.bindingEndDate));
-  }, [expenses]);
+  }, [filteredExpenses]);
 
   const doughnutData = useMemo(() => {
     if (!categoryTotals.length) {
@@ -210,16 +215,33 @@ const FixedExpensesPage = () => {
   return (
     <div>
       <div className="section-header">
-        <h2>Faste utgifter</h2>
-        <button onClick={() => handleOpenForm(null)}>Ny fast utgift</button>
-      </div>
-      {error && <p className="error-text">{error}</p>}
+          <div>
+            <h2>Faste utgifter</h2>
+            {selectedOwner && (
+              <div className="filter-indicator">
+                <span className="badge">Filtrert på {selectedOwner}</span>
+              </div>
+            )}
+          </div>
+          <div className="section-actions">
+            {selectedOwner && (
+              <button className="secondary" onClick={() => setSelectedOwner(null)}>
+                Fjern filter
+              </button>
+            )}
+            <button onClick={() => handleOpenForm(null)}>Ny fast utgift</button>
+          </div>
+        </div>
+        {error && <p className="error-text">{error}</p>}
 
       <div className="card-grid">
         <div className="card">
           <h3>Totale faste kostnader per måned</h3>
           <p className="stat">{formatCurrency(totalPerMonth)}</p>
-          <p className="muted">{expenses.length} aktive avtaler</p>
+          <p className="muted">
+            {filteredExpenses.length} aktive avtaler
+            {selectedOwner && ` (av ${expenses.length})`}
+          </p>
         </div>
         <div className="card">
           <h3>Sum per kategori</h3>
@@ -290,7 +312,10 @@ const FixedExpensesPage = () => {
 
       <div className="section-header">
         <h2>Alle faste utgifter</h2>
-        <span>{expenses.length} avtaler</span>
+        <span>
+          {filteredExpenses.length} avtaler
+          {selectedOwner && ` (av ${expenses.length})`}
+        </span>
       </div>
       <div className="category-sections">
         {groupedExpenses.length === 0 && <p className="muted">Ingen registrerte utgifter ennå.</p>}
@@ -326,9 +351,16 @@ const FixedExpensesPage = () => {
                         ) : (
                           <div className="chip-list">
                             {(expense.owners || []).map((owner) => (
-                              <span className="chip" key={owner}>
+                              <button
+                                type="button"
+                                className={`chip chip-button${selectedOwner === owner ? ' chip-active' : ''}`}
+                                key={owner}
+                                onClick={() =>
+                                  setSelectedOwner((current) => (current === owner ? null : owner))
+                                }
+                              >
                                 {owner}
-                              </span>
+                              </button>
                             ))}
                           </div>
                         )}
