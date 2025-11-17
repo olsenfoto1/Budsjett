@@ -5,6 +5,7 @@ import TransactionsPage from './pages/TransactionsPage.jsx';
 import CategoriesPage from './pages/CategoriesPage.jsx';
 import PagesPage from './pages/PagesPage.jsx';
 import DataPage from './pages/DataPage.jsx';
+import FixedExpensesPage from './pages/FixedExpensesPage.jsx';
 
 const getInitialTheme = () => {
   if (typeof window === 'undefined') return 'light';
@@ -38,9 +39,9 @@ const App = () => {
             <NavLink to="/" end>
               Oversikt
             </NavLink>
+            <NavLink to="/faste-utgifter">Faste utgifter</NavLink>
             <NavLink to="/transactions">Transaksjoner</NavLink>
             <NavLink to="/categories">Kategorier</NavLink>
-            <NavLink to="/pages">Sider</NavLink>
             <NavLink to="/data">Import/Export</NavLink>
           </div>
           <button type="button" className="theme-toggle" onClick={toggleTheme}>
@@ -51,6 +52,7 @@ const App = () => {
       <main>
         <Routes>
           <Route path="/" element={<DashboardPage />} />
+          <Route path="/faste-utgifter" element={<FixedExpensesPage />} />
           <Route path="/transactions" element={<TransactionsPage />} />
           <Route path="/categories" element={<CategoriesPage />} />
           <Route path="/pages" element={<PagesPage />} />

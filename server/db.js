@@ -7,14 +7,21 @@ if (!fs.existsSync(dataDir)) {
 }
 const dataPath = path.join(dataDir, 'store.json');
 
+const DEFAULT_SETTINGS = {
+  monthlyNetIncome: 0
+};
+
 const defaultData = {
   categories: [],
   pages: [],
   transactions: [],
+  fixedExpenses: [],
+  settings: { ...DEFAULT_SETTINGS },
   counters: {
     categories: 0,
     pages: 0,
-    transactions: 0
+    transactions: 0,
+    fixedExpenses: 0
   }
 };
 
@@ -46,6 +53,27 @@ class Store {
   }
 
   ensureDefaults() {
+    if (!this.state.counters) {
+      this.state.counters = { ...defaultData.counters };
+    }
+
+    if (!this.state.settings) {
+      this.state.settings = { ...DEFAULT_SETTINGS };
+    } else {
+      this.state.settings.monthlyNetIncome = Number(this.state.settings.monthlyNetIncome) || 0;
+    }
+
+    if (!Array.isArray(this.state.fixedExpenses)) {
+      this.state.fixedExpenses = [];
+    }
+
+    this.state.fixedExpenses = this.state.fixedExpenses.map((expense, index) =>
+      this.normalizeFixedExpense(expense, index + 1)
+    );
+
+    const highestFixedId = Math.max(0, ...this.state.fixedExpenses.map((exp) => exp.id || 0));
+    this.state.counters.fixedExpenses = Math.max(this.state.counters.fixedExpenses || 0, highestFixedId);
+
     if (!this.state.categories.length) {
       const defaults = [
         { name: 'Lønn', type: 'income', color: '#22c55e', description: 'Inntekter og lønn' },
@@ -55,6 +83,38 @@ class Store {
       ];
       defaults.forEach((cat) => this.addCategory(cat));
     }
+  }
+
+  normalizeFixedExpense(raw = {}, fallbackId = 0) {
+    const toOwners = (value) => {
+      if (Array.isArray(value)) return value.filter((owner) => !!owner?.trim()).map((owner) => owner.trim());
+      if (typeof value === 'string') {
+        return value
+          .split(',')
+          .map((owner) => owner.trim())
+          .filter(Boolean);
+      }
+      return [];
+    };
+
+    const now = new Date().toISOString();
+    const amount = Number(raw.amountPerMonth ?? raw.beløp_per_mnd ?? raw.amount_per_mnd ?? raw.amount ?? 0) || 0;
+    const notice = raw.noticePeriodMonths ?? raw.oppsigelsestid_mnd;
+    return {
+      id: raw.id ?? fallbackId,
+      name: raw.name || raw.navn || 'Uten navn',
+      amountPerMonth: amount,
+      category: raw.category || raw.kategori || 'Annet',
+      owners: toOwners(raw.owners || raw.eier || raw.eiere),
+      level: raw.level || raw.nivå || 'Må-ha',
+      startDate: raw.startDate || raw.startdato || '',
+      bindingEndDate: raw.bindingEndDate || raw.binding_utløper || raw.sluttdato || '',
+      noticePeriodMonths:
+        notice === null || notice === undefined || notice === '' ? null : Number(notice) || 0,
+      note: raw.note || raw.notat || '',
+      createdAt: raw.createdAt || now,
+      updatedAt: raw.updatedAt || now
+    };
   }
 
   nextId(key) {
@@ -191,6 +251,91 @@ class Store {
     return originalLength !== this.state.transactions.length;
   }
 
+  getFixedExpenses() {
+    return this.state.fixedExpenses;
+  }
+
+  addFixedExpense(payload) {
+    const now = new Date().toISOString();
+    const expense = {
+      id: payload.id ?? this.nextId('fixedExpenses'),
+      name: payload.name,
+      amountPerMonth: Number(payload.amountPerMonth) || 0,
+      category: payload.category || 'Annet',
+      owners: Array.isArray(payload.owners)
+        ? payload.owners.map((owner) => owner.trim()).filter(Boolean)
+        : [],
+      level: payload.level || 'Må-ha',
+      startDate: payload.startDate || '',
+      bindingEndDate: payload.bindingEndDate || '',
+      noticePeriodMonths:
+        payload.noticePeriodMonths === null || payload.noticePeriodMonths === ''
+          ? null
+          : Number(payload.noticePeriodMonths) || 0,
+      note: payload.note || '',
+      createdAt: payload.createdAt || now,
+      updatedAt: payload.updatedAt || now
+    };
+    this.state.fixedExpenses.push(expense);
+    this.save();
+    return expense;
+  }
+
+  updateFixedExpense(id, payload) {
+    const index = this.state.fixedExpenses.findIndex((exp) => exp.id === Number(id));
+    if (index === -1) return null;
+    const current = this.state.fixedExpenses[index];
+    const owners =
+      payload.owners === undefined
+        ? current.owners
+        : Array.isArray(payload.owners)
+        ? payload.owners.map((owner) => owner.trim()).filter(Boolean)
+        : [];
+    const updated = {
+      ...current,
+      ...payload,
+      owners,
+      amountPerMonth:
+        payload.amountPerMonth !== undefined
+          ? Number(payload.amountPerMonth) || 0
+          : current.amountPerMonth,
+      noticePeriodMonths:
+        payload.noticePeriodMonths === undefined
+          ? current.noticePeriodMonths
+          : payload.noticePeriodMonths === null || payload.noticePeriodMonths === ''
+          ? null
+          : Number(payload.noticePeriodMonths) || 0,
+      updatedAt: new Date().toISOString()
+    };
+    this.state.fixedExpenses[index] = updated;
+    this.save();
+    return updated;
+  }
+
+  deleteFixedExpense(id) {
+    const expenseId = Number(id);
+    const originalLength = this.state.fixedExpenses.length;
+    this.state.fixedExpenses = this.state.fixedExpenses.filter((exp) => exp.id !== expenseId);
+    this.save();
+    return originalLength !== this.state.fixedExpenses.length;
+  }
+
+  getSettings() {
+    return this.state.settings || { ...DEFAULT_SETTINGS };
+  }
+
+  updateSettings(payload) {
+    this.state.settings = {
+      ...this.getSettings(),
+      ...payload,
+      monthlyNetIncome: Number(
+        payload.monthlyNetIncome ?? this.state.settings?.monthlyNetIncome ?? DEFAULT_SETTINGS.monthlyNetIncome
+      ) || 0
+    };
+    this.save();
+    return this.state.settings;
+  }
+
   replaceAll(data) {
     const categories = (data.categories || []).map((cat, index) => ({
       id: cat.id ?? index + 1,
@@ -221,16 +366,29 @@ class Store {
       metadata: tx.metadata || {}
     }));
 
+    const fixedExpensesRaw = data.fixedExpenses || data['faste_utgifter'] || [];
+    const fixedExpenses = fixedExpensesRaw.map((expense, index) =>
+      this.normalizeFixedExpense(expense, expense.id ?? index + 1)
+    );
+
+    const settingsPayload = data.settings || {};
+    const settings = {
+      monthlyNetIncome: Number(settingsPayload.monthlyNetIncome) || 0
+    };
+
     const counters = data.counters || {
       categories: Math.max(0, ...categories.map((c) => c.id || 0)),
       pages: Math.max(0, ...pages.map((p) => p.id || 0)),
-      transactions: Math.max(0, ...transactions.map((t) => t.id || 0))
+      transactions: Math.max(0, ...transactions.map((t) => t.id || 0)),
+      fixedExpenses: Math.max(0, ...fixedExpenses.map((f) => f.id || 0))
     };
 
     this.state = {
       categories,
       pages,
       transactions,
+      fixedExpenses,
+      settings,
       counters
     };
     this.save();
