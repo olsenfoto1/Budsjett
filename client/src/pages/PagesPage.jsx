@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api.js';
 
 const emptyPage = { name: '', description: '', color: '#059669', metadata: { type: 'custom' } };
@@ -50,6 +50,22 @@ const PagesPage = () => {
     load();
   };
 
+  const totalsByPage = useMemo(() => {
+    const totals = {};
+    transactions.forEach((tx) => {
+      if (!tx.pageId) return;
+      if (!totals[tx.pageId]) {
+        totals[tx.pageId] = { income: 0, expense: 0 };
+      }
+      if (tx.type === 'income') {
+        totals[tx.pageId].income += tx.amount;
+      } else {
+        totals[tx.pageId].expense += tx.amount;
+      }
+    });
+    return totals;
+  }, [transactions]);
+
   return (
     <div>
       <div className="section-header">
@@ -92,7 +108,7 @@ const PagesPage = () => {
       </div>
       <div className="card-grid">
         {pages.map((page) => (
-          <div className="card" key={page.id} style={{ borderColor: page.color }}>
+          <div className="card page-card" key={page.id} style={{ borderColor: page.color }}>
             <span className="badge" style={{ background: page.color, color: '#fff' }}>
               {page.metadata?.tag || 'Tilpasset'}
             </span>
@@ -104,6 +120,26 @@ const PagesPage = () => {
                 {page.balance.toLocaleString('no-NO', { style: 'currency', currency: 'NOK' })}
               </strong>
             </p>
+            <div className="page-totals">
+              <span>
+                Inntekter:{' '}
+                <strong>
+                  {(page.totalIncome ?? totalsByPage[page.id]?.income ?? 0).toLocaleString('no-NO', {
+                    style: 'currency',
+                    currency: 'NOK'
+                  })}
+                </strong>
+              </span>
+              <span>
+                Utgifter:{' '}
+                <strong>
+                  {(page.totalExpense ?? totalsByPage[page.id]?.expense ?? 0).toLocaleString('no-NO', {
+                    style: 'currency',
+                    currency: 'NOK'
+                  })}
+                </strong>
+              </span>
+            </div>
             <p>{transactions.filter((tx) => tx.pageId === page.id).length} transaksjoner</p>
             <button
               className="secondary"

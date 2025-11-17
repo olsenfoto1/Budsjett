@@ -1,23 +1,23 @@
 import { useEffect, useMemo, useState } from 'react';
-import { format } from 'date-fns';
 import { api } from '../api.js';
+import { formatOsloDateTime, fromDateTimeInputValue, nowDateTimeInputValue, toDateTimeInputValue } from '../utils/dates.js';
 
-const emptyForm = {
+const createEmptyForm = () => ({
   title: '',
   amount: '',
   type: 'expense',
   categoryId: '',
   pageId: '',
   tags: '',
-  occurredOn: format(new Date(), 'yyyy-MM-dd'),
+  occurredOn: nowDateTimeInputValue(),
   notes: ''
-};
+});
 
 const TransactionsPage = () => {
   const [transactions, setTransactions] = useState([]);
   const [categories, setCategories] = useState([]);
   const [pages, setPages] = useState([]);
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState(createEmptyForm());
   const [editingId, setEditingId] = useState(null);
   const [filters, setFilters] = useState({ type: '', categoryId: '', tag: '', pageId: '', search: '' });
   const [error, setError] = useState('');
@@ -43,7 +43,7 @@ const TransactionsPage = () => {
   }, [JSON.stringify(filters)]);
 
   const resetForm = () => {
-    setForm(emptyForm);
+    setForm(createEmptyForm());
     setEditingId(null);
   };
 
@@ -54,7 +54,8 @@ const TransactionsPage = () => {
       amount: Number(form.amount),
       categoryId: form.categoryId ? Number(form.categoryId) : null,
       pageId: form.pageId ? Number(form.pageId) : null,
-      tags: form.tags ? form.tags.split(',').map((tag) => tag.trim()).filter(Boolean) : []
+      tags: form.tags ? form.tags.split(',').map((tag) => tag.trim()).filter(Boolean) : [],
+      occurredOn: fromDateTimeInputValue(form.occurredOn)
     };
     try {
       if (editingId) {
@@ -78,7 +79,7 @@ const TransactionsPage = () => {
       categoryId: tx.categoryId || '',
       pageId: tx.pageId || '',
       tags: (tx.tags || []).join(', '),
-      occurredOn: tx.occurredOn,
+      occurredOn: toDateTimeInputValue(tx.occurredOn),
       notes: tx.notes || ''
     });
   };
@@ -145,7 +146,7 @@ const TransactionsPage = () => {
           ))}
         </select>
         <input
-          type="date"
+          type="datetime-local"
           value={form.occurredOn}
           onChange={(e) => setForm({ ...form, occurredOn: e.target.value })}
         />
@@ -222,7 +223,7 @@ const TransactionsPage = () => {
           <tbody>
             {transactions.map((tx) => (
               <tr key={tx.id}>
-                <td>{tx.occurredOn}</td>
+                <td>{formatOsloDateTime(tx.occurredOn)}</td>
                 <td>
                   <strong>{tx.title}</strong>
                   <br />

@@ -47,12 +47,24 @@ app.delete('/api/categories/:id', (req, res) => {
 });
 
 app.get('/api/pages', (req, res) => {
+  const transactions = db.getTransactions();
   const pages = db.getPages().map((page) => {
-    const balance = db
-      .getTransactions()
+    const totals = transactions
       .filter((tx) => tx.pageId === page.id)
-      .reduce((sum, tx) => sum + (tx.type === 'expense' ? -tx.amount : tx.amount), 0);
-    return { ...page, balance };
+      .reduce(
+        (acc, tx) => {
+          if (tx.type === 'income') {
+            acc.totalIncome += tx.amount;
+            acc.balance += tx.amount;
+          } else {
+            acc.totalExpense += tx.amount;
+            acc.balance -= tx.amount;
+          }
+          return acc;
+        },
+        { totalIncome: 0, totalExpense: 0, balance: 0 }
+      );
+    return { ...page, ...totals };
   });
   res.json(pages);
 });
@@ -188,12 +200,24 @@ app.get('/api/dashboard', (req, res) => {
     });
   });
 
-  const pageBalances = pages.map((page) => ({
-    name: page.name,
-    balance: transactions
+  const pageBalances = pages.map((page) => {
+    const totals = transactions
       .filter((tx) => tx.pageId === page.id)
-      .reduce((sum, tx) => sum + (tx.type === 'expense' ? -tx.amount : tx.amount), 0)
-  }));
+      .reduce(
+        (acc, tx) => {
+          if (tx.type === 'income') {
+            acc.totalIncome += tx.amount;
+            acc.balance += tx.amount;
+          } else {
+            acc.totalExpense += tx.amount;
+            acc.balance -= tx.amount;
+          }
+          return acc;
+        },
+        { balance: 0, totalIncome: 0, totalExpense: 0 }
+      );
+    return { name: page.name, ...totals };
+  });
 
   res.json({
     totalIncome,
