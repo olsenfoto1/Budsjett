@@ -365,6 +365,21 @@ textarea {
   margin: 1rem 0;
 }
 
+.analysis-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.analysis-grid .muted,
+.analysis-grid strong {
+  display: block;
+}
+
+.analysis-grid strong {
+  font-size: 1.2rem;
+}
+
 .analysis-item {
   padding: 0.75rem 1rem;
   border: 1px solid var(--border-color);
@@ -379,7 +394,165 @@ textarea {
   background: var(--accent-soft);
   color: var(--accent);
   font-size: 0.75rem;
-  margin: 0 0.25rem 0.25rem 0;
+  margin: 0 0.35rem 0.35rem 0;
+}
+
+.chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.savings-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.savings-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 360px) 1fr;
+  gap: 1.5rem;
+  align-items: flex-start;
+}
+
+@media (max-width: 960px) {
+  .savings-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.savings-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.progress-overview {
+  margin-top: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--surface-alt);
+  overflow: hidden;
+}
+
+.progress-bar span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #6366f1, #22d3ee);
+}
+
+.goal-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+}
+
+.goal-card {
+  border: 1px solid var(--border-color);
+  border-radius: 1.25rem;
+  background: var(--surface-alt);
+  padding: 1rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.goal-card.completed {
+  border-color: #16a34a;
+}
+
+.goal-card.completed .progress-bar span {
+  background: linear-gradient(90deg, #22c55e, #16a34a);
+}
+
+.goal-card header h4 {
+  margin: 0;
+}
+
+.goal-card header .muted {
+  margin-top: 0.25rem;
+}
+
+.goal-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.goal-progress-values {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.goal-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem;
+}
+
+.goal-meta span {
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.goal-meta strong {
+  display: block;
+  margin-top: 0.15rem;
+}
+
+.contribution-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.contribution-row input {
+  flex: 1;
+  min-width: 140px;
+}
+
+.goal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.filter-buttons {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.filter-buttons button {
+  border-radius: 999px;
+  padding: 0.35rem 0.9rem;
+  font-size: 0.85rem;
+}
+
+.filter-buttons button.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: transparent;
+}
+
+@media (max-width: 640px) {
+  .contribution-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }
 
 .pill-list {

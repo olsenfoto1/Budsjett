@@ -304,12 +304,17 @@ const FixedExpensesPage = () => {
                 <td>{formatCurrency(expense.amountPerMonth)}</td>
                 <td>{expense.category}</td>
                 <td>
-                  {(expense.owners || []).length === 0 && <span className="muted">-</span>}
-                  {(expense.owners || []).map((owner) => (
-                    <span className="chip" key={owner}>
-                      {owner}
-                    </span>
-                  ))}
+                  {(expense.owners || []).length === 0 ? (
+                    <span className="muted">-</span>
+                  ) : (
+                    <div className="chip-list">
+                      {(expense.owners || []).map((owner) => (
+                        <span className="chip" key={owner}>
+                          {owner}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </td>
                 <td>{expense.level}</td>
                 <td>{formatDate(expense.bindingEndDate)}</td>
