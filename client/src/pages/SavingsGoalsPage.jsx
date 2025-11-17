@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { formatCurrency, formatDate } from '../utils/format.js';
-
-const STORAGE_KEY = 'budsjett-savings-goals';
+import { loadSavingsGoals, saveSavingsGoals, summarizeSavingsGoals } from '../utils/savings.js';
 
 const createEmptyGoal = () => ({
   title: '',
@@ -21,45 +20,22 @@ const createId = () => {
 };
 
 const SavingsGoalsPage = () => {
-  const [goals, setGoals] = useState(() => {
-    if (typeof window === 'undefined') return [];
-    try {
-      const stored = window.localStorage.getItem(STORAGE_KEY);
-      return stored ? JSON.parse(stored) : [];
-    } catch (err) {
-      console.error('Kunne ikke lese sparemål fra lagring', err);
-      return [];
-    }
-  });
+  const [goals, setGoals] = useState(() => loadSavingsGoals());
   const [form, setForm] = useState(createEmptyGoal());
   const [editingId, setEditingId] = useState(null);
   const [contributionValues, setContributionValues] = useState({});
   const [filter, setFilter] = useState('all');
 
   useEffect(() => {
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(goals));
-    } catch (err) {
-      console.error('Kunne ikke lagre sparemål', err);
-    }
+    saveSavingsGoals(goals);
   }, [goals]);
 
   const stats = useMemo(() => {
-    const totalTarget = goals.reduce((sum, goal) => sum + (Number(goal.targetAmount) || 0), 0);
-    const totalSaved = goals.reduce((sum, goal) => sum + (Number(goal.savedAmount) || 0), 0);
+    const summary = summarizeSavingsGoals(goals);
     const totalMonthly = goals.reduce((sum, goal) => sum + (Number(goal.monthlyContribution) || 0), 0);
-    const completed = goals.filter((goal) => Number(goal.savedAmount) >= Number(goal.targetAmount) && goal.targetAmount > 0);
-    const nextDeadline = goals
-      .filter((goal) => goal.dueDate)
-      .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))[0];
-
     return {
-      totalTarget,
-      totalSaved,
-      totalMonthly,
-      completedCount: completed.length,
-      avgProgress: totalTarget > 0 ? Math.round((totalSaved / totalTarget) * 100) : 0,
-      nextDeadline
+      ...summary,
+      totalMonthly
     };
   }, [goals]);
 

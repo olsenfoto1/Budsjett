@@ -251,6 +251,13 @@ class Store {
     return originalLength !== this.state.transactions.length;
   }
 
+  clearTransactions() {
+    const deleted = this.state.transactions.length;
+    this.state.transactions = [];
+    this.save();
+    return deleted;
+  }
+
   getFixedExpenses() {
     return this.state.fixedExpenses;
   }
