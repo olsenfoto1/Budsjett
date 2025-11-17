@@ -319,7 +319,7 @@ const FixedExpensesPage = () => {
                 <td>{formatDate(expense.bindingEndDate)}</td>
                 <td>{formatNotice(expense.noticePeriodMonths)}</td>
                 <td>{expense.note || '-'}</td>
-                <td>
+                <td className="table-actions-cell">
                   <div className="table-actions">
                     <button className="secondary" onClick={() => setSimulatedExpense(expense)}>
                       Simuler oppsigelse
