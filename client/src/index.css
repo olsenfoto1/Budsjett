@@ -242,6 +242,10 @@ main {
 .category-total {
   text-align: right;
   min-width: 140px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.15rem;
 }
 
 .category-expense-list {
@@ -289,6 +293,10 @@ main {
 .expense-amount {
   text-align: right;
   min-width: 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.15rem;
 }
 
 .expense-amount strong {
@@ -315,6 +323,7 @@ main {
 
   .expense-amount {
     text-align: left;
+    align-items: flex-start;
   }
 }
 
