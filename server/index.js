@@ -4,7 +4,6 @@ const path = require('path');
 const fs = require('fs');
 const db = require('./db');
 
-const FIXED_EXPENSE_CATEGORIES = ['Abonnement', 'Lån', 'Forsikring', 'Strøm', 'Annet'];
 const FIXED_EXPENSE_LEVELS = ['Må-ha', 'Kjekt å ha', 'Luksus'];
 
 const app = express();
@@ -207,9 +206,6 @@ app.post('/api/faste-utgifter', (req, res) => {
   if (amountPerMonth === undefined || Number.isNaN(Number(amountPerMonth))) {
     return res.status(400).json({ error: 'Beløp per måned må være et tall.' });
   }
-  if (!FIXED_EXPENSE_CATEGORIES.includes(category)) {
-    return res.status(400).json({ error: 'Ugyldig kategori.' });
-  }
   if (!FIXED_EXPENSE_LEVELS.includes(level)) {
     return res.status(400).json({ error: 'Ugyldig nivå.' });
   }
@@ -224,7 +220,7 @@ app.post('/api/faste-utgifter', (req, res) => {
   const expense = db.addFixedExpense({
     name,
     amountPerMonth,
-    category,
+    category: typeof category === 'string' && category.trim() ? category.trim() : 'Annet',
     owners: normalizeOwnersInput(owners),
     level,
     startDate,
@@ -238,13 +234,13 @@ app.post('/api/faste-utgifter', (req, res) => {
 app.put('/api/faste-utgifter/:id', (req, res) => {
   const { id } = req.params;
   const { category, level, noticePeriodMonths, owners } = req.body;
-  if (category && !FIXED_EXPENSE_CATEGORIES.includes(category)) {
-    return res.status(400).json({ error: 'Ugyldig kategori.' });
-  }
   if (level && !FIXED_EXPENSE_LEVELS.includes(level)) {
     return res.status(400).json({ error: 'Ugyldig nivå.' });
   }
   const update = { ...req.body };
+  if (category !== undefined) {
+    update.category = typeof category === 'string' && category.trim() ? category.trim() : 'Annet';
+  }
   if (req.body.amountPerMonth !== undefined && Number.isNaN(Number(req.body.amountPerMonth))) {
     return res.status(400).json({ error: 'Beløp per måned må være et tall.' });
   }

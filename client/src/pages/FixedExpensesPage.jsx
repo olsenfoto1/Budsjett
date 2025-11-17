@@ -6,7 +6,7 @@ import { formatCurrency, formatDate, formatNotice } from '../utils/format.js';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
-const FALLBACK_CATEGORY_OPTIONS = ['Abonnement', 'Lån', 'Forsikring', 'Strøm', 'Annet'];
+const FALLBACK_CATEGORY_OPTIONS = ['Abonnementer', 'Lån', 'Forsikring', 'Strøm', 'Annet'];
 const LEVEL_OPTIONS = ['Må-ha', 'Kjekt å ha', 'Luksus'];
 
 const createEmptyForm = (category = FALLBACK_CATEGORY_OPTIONS[0]) => ({
