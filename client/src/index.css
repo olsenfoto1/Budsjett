@@ -283,6 +283,17 @@ button.secondary {
   box-shadow: none;
 }
 
+button.danger {
+  background: linear-gradient(135deg, #f87171, #dc2626);
+  color: #fff;
+  border-color: rgba(220, 38, 38, 0.7);
+  box-shadow: 0 15px 35px rgba(220, 38, 38, 0.25);
+}
+
+button.danger:hover {
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+}
+
 .theme-toggle {
   background: transparent;
   color: var(--text-primary);
@@ -364,6 +375,21 @@ textarea {
 .muted {
   color: var(--text-secondary);
   font-size: 0.9rem;
+}
+
+.progress-track {
+  width: 100%;
+  height: 0.55rem;
+  background: rgba(148, 163, 184, 0.35);
+  border-radius: 999px;
+  overflow: hidden;
+  margin: 0.5rem 0 0.35rem;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(120deg, #22c55e, #84cc16);
+  transition: width 0.3s ease;
 }
 
 .chart-wrapper {

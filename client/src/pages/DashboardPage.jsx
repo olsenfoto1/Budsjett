@@ -3,6 +3,7 @@ import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearSca
 import { Line, Doughnut, Bar } from 'react-chartjs-2';
 import { api } from '../api.js';
 import { formatCurrency } from '../utils/format.js';
+import { loadSavingsGoals, summarizeSavingsGoals } from '../utils/savings.js';
 
 ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, PointElement, LineElement, BarElement);
 
@@ -11,6 +12,7 @@ const DashboardPage = () => {
   const [error, setError] = useState('');
   const [incomeInput, setIncomeInput] = useState('');
   const [statusMessage, setStatusMessage] = useState('');
+  const [savingsStats, setSavingsStats] = useState(() => summarizeSavingsGoals(loadSavingsGoals()));
 
   const fetchSummary = async () => {
     try {
@@ -24,6 +26,21 @@ const DashboardPage = () => {
 
   useEffect(() => {
     fetchSummary();
+  }, []);
+
+  useEffect(() => {
+    const updateStats = () => {
+      setSavingsStats(summarizeSavingsGoals(loadSavingsGoals()));
+    };
+    updateStats();
+    if (typeof window !== 'undefined') {
+      window.addEventListener('storage', updateStats);
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('storage', updateStats);
+      }
+    };
   }, []);
 
   const handleIncomeSubmit = async (event) => {
@@ -129,11 +146,20 @@ const DashboardPage = () => {
           <p className="muted">Basert på netto inntekt</p>
         </div>
         <div className="card">
-          <h3>Netto økonomi</h3>
-          <p className="stat" style={{ color: summary.net >= 0 ? '#16a34a' : '#dc2626' }}>
-            {formatCurrency(summary.net)}
-          </p>
-          <p className="muted">Transaksjoner totalt</p>
+          <h3>Sparemål</h3>
+          {savingsStats.goalCount > 0 ? (
+            <>
+              <p className="stat">{savingsStats.avgProgress}%</p>
+              <div className="progress-track" aria-label="Spareprogresjon">
+                <div className="progress-fill" style={{ width: `${savingsStats.avgProgress}%` }} />
+              </div>
+              <p className="muted">
+                {formatCurrency(savingsStats.totalSaved)} spart av {formatCurrency(savingsStats.totalTarget)}
+              </p>
+            </>
+          ) : (
+            <p className="muted">Opprett sparemål for å følge progresjonen her.</p>
+          )}
         </div>
       </div>
 

@@ -181,6 +181,11 @@ app.delete('/api/transactions/:id', (req, res) => {
   res.json({ deleted: removed });
 });
 
+app.delete('/api/transactions', (req, res) => {
+  const deleted = db.clearTransactions();
+  res.json({ deleted });
+});
+
 app.get('/api/faste-utgifter', (req, res) => {
   res.json(db.getFixedExpenses());
 });

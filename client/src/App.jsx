@@ -4,7 +4,7 @@ import DashboardPage from './pages/DashboardPage.jsx';
 import SavingsGoalsPage from './pages/SavingsGoalsPage.jsx';
 import CategoriesPage from './pages/CategoriesPage.jsx';
 import PagesPage from './pages/PagesPage.jsx';
-import DataPage from './pages/DataPage.jsx';
+import SettingsPage from './pages/SettingsPage.jsx';
 import FixedExpensesPage from './pages/FixedExpensesPage.jsx';
 
 const getInitialTheme = () => {
@@ -42,7 +42,7 @@ const App = () => {
             <NavLink to="/faste-utgifter">Faste utgifter</NavLink>
             <NavLink to="/sparemal">Sparemål</NavLink>
             <NavLink to="/categories">Kategorier</NavLink>
-            <NavLink to="/data">Import/Export</NavLink>
+            <NavLink to="/innstillinger">Innstillinger</NavLink>
           </div>
           <button type="button" className="theme-toggle" onClick={toggleTheme}>
             {theme === 'light' ? '🌙 Mørk modus' : '☀️ Lys modus'}
@@ -56,7 +56,7 @@ const App = () => {
           <Route path="/sparemal" element={<SavingsGoalsPage />} />
           <Route path="/categories" element={<CategoriesPage />} />
           <Route path="/pages" element={<PagesPage />} />
-          <Route path="/data" element={<DataPage />} />
+          <Route path="/innstillinger" element={<SettingsPage />} />
         </Routes>
       </main>
     </div>
