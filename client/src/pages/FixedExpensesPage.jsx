@@ -199,7 +199,6 @@ const FixedExpensesPage = () => {
     () => (hasManualOwnerSelection ? selectedOwners : defaultOwners),
     [hasManualOwnerSelection, selectedOwners, defaultOwners]
   );
-  const defaultOwnerCount = defaultOwners.length;
 
   const filteredExpenses = useMemo(() => {
     if (!activeOwners.length) return expenses;
@@ -362,9 +361,7 @@ const FixedExpensesPage = () => {
     ? `${activeOwners.join(', ')} sin samlede netto inntekt`
     : 'netto inntekt';
   const showingDefaultOwnerIncome = !hasManualOwnerSelection && defaultOwners.length > 0;
-  const ownerFilterActive = activeOwners.length > 0;
-  const manualFilterActive = hasManualOwnerSelection && ownerFilterActive;
-  const defaultFilterActive = ownerFilterActive && !hasManualOwnerSelection && defaultOwnerCount > 0;
+  const manualFilterActive = hasManualOwnerSelection && activeOwners.length > 0;
 
   const handleOpenForm = (expense) => {
     // Hent alltid siste kategorier når skjemaet åpnes
@@ -409,12 +406,7 @@ const FixedExpensesPage = () => {
     [defaultOwners, hasManualOwnerSelection]
   );
 
-  const showAllOwners = useCallback(() => {
-    setSelectedOwners([]);
-    setHasManualOwnerSelection(true);
-  }, []);
-
-  const restoreDefaultOwners = useCallback(() => {
+  const clearOwnerFilter = useCallback(() => {
     setSelectedOwners([]);
     setHasManualOwnerSelection(false);
   }, []);
@@ -508,30 +500,16 @@ const FixedExpensesPage = () => {
       <div className="section-header">
         <div>
           <h2>Faste utgifter</h2>
-          {ownerFilterActive && (
+          {manualFilterActive && (
             <div className="filter-indicator">
-              <span className="badge">
-                {defaultFilterActive
-                  ? `Standardfilter: ${activeOwners.join(', ')}`
-                  : `Filtrert på ${activeOwners.join(', ')}`}
-              </span>
+              <span className="badge">Filtrert på {activeOwners.join(', ')}</span>
             </div>
           )}
         </div>
         <div className="section-actions">
-          {defaultFilterActive && (
-            <button className="secondary" onClick={showAllOwners}>
-              Vis alle eiere
-            </button>
-          )}
-          {manualFilterActive && (
-            <button className="secondary" onClick={showAllOwners}>
+          {hasManualOwnerSelection && (
+            <button className="secondary" onClick={clearOwnerFilter}>
               Fjern filter
-            </button>
-          )}
-          {hasManualOwnerSelection && defaultOwnerCount > 0 && !defaultFilterActive && (
-            <button className="secondary" onClick={restoreDefaultOwners}>
-              Bruk standardfilter
             </button>
           )}
           <button onClick={() => handleOpenForm(null)}>Ny fast utgift</button>
@@ -570,7 +548,7 @@ const FixedExpensesPage = () => {
           <p className="stat">{formatCurrency(totalPerMonth)}</p>
           <p className="muted">
             {filteredExpenses.length} aktive avtaler
-            {ownerFilterActive && ` (av ${expenses.length})`}
+            {manualFilterActive && ` (av ${expenses.length})`}
             {hiddenCategories.length > 0 && (
               <>
                 <br />
@@ -678,7 +656,7 @@ const FixedExpensesPage = () => {
         <h2>Alle faste utgifter</h2>
         <span>
           {filteredExpenses.length} avtaler
-          {ownerFilterActive && ` (av ${expenses.length})`}
+          {manualFilterActive && ` (av ${expenses.length})`}
         </span>
       </div>
       <div className="category-sections">
