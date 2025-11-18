@@ -41,16 +41,6 @@ const DashboardPage = () => {
     };
   }, []);
 
-  const fixedCategories = summary?.fixedExpenseCategoryTotals || [];
-  const fixedLevels = summary?.fixedExpenseLevelTotals || [];
-  const bindingSoon = summary?.bindingExpirations || [];
-
-  useEffect(() => {
-    setHiddenCategories((current) =>
-      current.filter((category) => fixedCategories.some((item) => item.category === category))
-    );
-  }, [fixedCategories]);
-
   if (error) {
     return <p>Kunne ikke laste data: {error}</p>;
   }
