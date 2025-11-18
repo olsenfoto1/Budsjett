@@ -862,11 +862,18 @@ select:focus {
   inset: 0;
   background: rgba(15, 23, 42, 0.75);
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
-  padding: 4rem 1.5rem 1.5rem;
+  padding: 1.5rem;
   z-index: 50;
   overflow-y: auto;
+}
+
+@media (max-height: 700px) {
+  .modal-overlay {
+    align-items: flex-start;
+    padding-top: 2rem;
+  }
 }
 
 .modal-card {
