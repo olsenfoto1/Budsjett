@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, PointElement, LineElement, BarElement } from 'chart.js';
 import { Line, Doughnut, Bar } from 'react-chartjs-2';
 import { api } from '../api.js';
@@ -11,6 +11,7 @@ const DashboardPage = () => {
   const [summary, setSummary] = useState(null);
   const [error, setError] = useState('');
   const [savingsStats, setSavingsStats] = useState(() => summarizeSavingsGoals(loadSavingsGoals()));
+  const [hiddenCategories, setHiddenCategories] = useState([]);
 
   const fetchSummary = async () => {
     try {
@@ -40,6 +41,16 @@ const DashboardPage = () => {
     };
   }, []);
 
+  const fixedCategories = summary?.fixedExpenseCategoryTotals || [];
+  const fixedLevels = summary?.fixedExpenseLevelTotals || [];
+  const bindingSoon = summary?.bindingExpirations || [];
+
+  useEffect(() => {
+    setHiddenCategories((current) =>
+      current.filter((category) => fixedCategories.some((item) => item.category === category))
+    );
+  }, [fixedCategories]);
+
   if (error) {
     return <p>Kunne ikke laste data: {error}</p>;
   }
@@ -48,26 +59,26 @@ const DashboardPage = () => {
     return <p>Laster...</p>;
   }
 
-  const fixedCategories = summary.fixedExpenseCategoryTotals || [];
-  const fixedLevels = summary.fixedExpenseLevelTotals || [];
-  const bindingSoon = summary.bindingExpirations || [];
-
-  const doughnutData =
-    fixedCategories.length > 0
-      ? {
-          labels: fixedCategories.map((item) => item.category),
-          datasets: [
-            {
-              label: 'Faste kostnader',
-              data: fixedCategories.map((item) => item.total),
-              backgroundColor: fixedCategories.map((item) => item.color || '#94a3b8')
-            }
-          ]
-        }
-      : null;
+  const visibleFixedCategories = useMemo(
+    () => fixedCategories.filter((item) => !hiddenCategories.includes(item.category)),
+    [fixedCategories, hiddenCategories]
+  );
 
   const baselineFixedCosts =
     summary.effectiveFixedExpenseTotal ?? summary.fixedExpenseTotal ?? summary.fixedExpensesTotal ?? 0;
+  const baselineFreeAfterFixed = summary.freeAfterFixed ?? 0;
+  const netIncomeCandidate =
+    typeof summary.activeMonthlyNetIncome === 'number'
+      ? summary.activeMonthlyNetIncome
+      : typeof summary.monthlyNetIncome === 'number'
+      ? summary.monthlyNetIncome
+      : baselineFixedCosts + baselineFreeAfterFixed;
+  const hasNetIncome = Number.isFinite(netIncomeCandidate);
+  const visibleFixedTotal = visibleFixedCategories.reduce((sum, item) => sum + (item.total || 0), 0);
+  const visibleFreeAfterFixed = hasNetIncome
+    ? netIncomeCandidate - visibleFixedTotal
+    : baselineFreeAfterFixed + (baselineFixedCosts - visibleFixedTotal);
+
   const monthlyForecast = Array.from({ length: 12 }, (_, index) => {
     const date = new Date();
     date.setMonth(date.getMonth() + index);
@@ -75,8 +86,8 @@ const DashboardPage = () => {
       month: 'short',
       year: 'numeric'
     });
-    const fixedCosts = baselineFixedCosts;
-    const availableAfterFixed = summary.freeAfterFixed || 0;
+    const fixedCosts = visibleFixedTotal;
+    const availableAfterFixed = visibleFreeAfterFixed;
     return {
       label,
       fixedCosts,
@@ -102,6 +113,49 @@ const DashboardPage = () => {
     ]
   };
 
+  const handleLegendClick = useCallback((event, legendItem, legend) => {
+    const index = legendItem.index;
+    const label = legend?.chart?.data?.labels?.[index];
+    if (!label) {
+      return;
+    }
+    setHiddenCategories((current) => {
+      if (current.includes(label)) {
+        return current.filter((item) => item !== label);
+      }
+      return [...current, label];
+    });
+    legend?.chart?.toggleDataVisibility(index);
+    legend?.chart?.update();
+  }, []);
+
+  const doughnutOptions = useMemo(
+    () => ({
+      plugins: {
+        legend: {
+          position: 'bottom',
+          onClick: handleLegendClick
+        }
+      },
+      cutout: '65%'
+    }),
+    [handleLegendClick]
+  );
+
+  const doughnutData =
+    fixedCategories.length > 0
+      ? {
+          labels: fixedCategories.map((item) => item.category),
+          datasets: [
+            {
+              label: 'Faste kostnader',
+              data: fixedCategories.map((item) => item.total),
+              backgroundColor: fixedCategories.map((item) => item.color || '#94a3b8')
+            }
+          ]
+        }
+      : null;
+
   const tagBarData = {
     labels: Object.keys(summary.tagTotals),
     datasets: [
@@ -114,21 +168,37 @@ const DashboardPage = () => {
   };
 
   return (
-    <div>
+    <div className="dashboard-page">
+      <div className="section-header">
+        <div>
+          <h2>Oversikt</h2>
+          {hiddenCategories.length > 0 && (
+            <div className="filter-indicator">
+              <span className="badge">
+                Viser {visibleFixedCategories.length}/{fixedCategories.length} kategorier fra grafen
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+
       <div className="card-grid">
-        <div className="card">
+        <div className="card insight-card glow-lilac">
           <h3>Faste kostnader per måned</h3>
-          <p className="stat">{formatCurrency(summary.fixedExpenseTotal)}</p>
-          <p className="muted">{summary.fixedExpensesCount} aktive avtaler</p>
-        </div>
-        <div className="card">
-          <h3>Tilgjengelig etter faste kostnader</h3>
-          <p className="stat" style={{ color: summary.freeAfterFixed >= 0 ? '#16a34a' : '#dc2626' }}>
-            {formatCurrency(summary.freeAfterFixed)}
+          <p className="stat">{formatCurrency(visibleFixedTotal || summary.fixedExpenseTotal)}</p>
+          <p className="muted">
+            {summary.fixedExpensesCount} aktive avtaler
+            {hiddenCategories.length > 0 && ' (filter fra grafen)'}
           </p>
-          <p className="muted">Basert på netto inntekt</p>
         </div>
-        <div className="card">
+        <div className="card insight-card glow-mint">
+          <h3>Tilgjengelig etter faste kostnader</h3>
+          <p className="stat" style={{ color: visibleFreeAfterFixed >= 0 ? '#16a34a' : '#dc2626' }}>
+            {formatCurrency(visibleFreeAfterFixed)}
+          </p>
+          <p className="muted">Basert på inntekten som er registrert under Innstillinger.</p>
+        </div>
+        <div className="card insight-card glow-sky">
           <h3>Sparemål</h3>
           {savingsStats.goalCount > 0 ? (
             <>
@@ -146,22 +216,28 @@ const DashboardPage = () => {
         </div>
       </div>
 
-      <div className="section-header">
-        <h2>Fordeling av faste kostnader</h2>
-        {doughnutData && <span className="badge">{fixedCategories.length} kategorier</span>}
-      </div>
-      <div className="card">
+      <div className="card insight-card glow-ocean chart-card">
+        <div className="section-header" style={{ marginTop: 0 }}>
+          <h2>Fordeling av faste kostnader</h2>
+          {doughnutData && (
+            <span className="badge">
+              {hiddenCategories.length === 0
+                ? `${fixedCategories.length} kategorier`
+                : `${visibleFixedCategories.length}/${fixedCategories.length} kategorier`}
+            </span>
+          )}
+        </div>
         {doughnutData ? (
           <div className="chart-wrapper">
-            <Doughnut data={doughnutData} options={{ plugins: { legend: { position: 'bottom' } }, cutout: '60%' }} />
+            <Doughnut data={doughnutData} options={doughnutOptions} />
           </div>
         ) : (
           <p className="muted">Registrer faste utgifter for å se fordelingen.</p>
         )}
       </div>
 
-      <div className="card-grid" style={{ marginTop: '1.5rem' }}>
-        <div className="card">
+      <div className="card-grid">
+        <div className="card insight-card glow-amber">
           <h3>Prioritering</h3>
           {fixedLevels.map((item) => (
             <div key={item.level} className="pill-row">
@@ -169,8 +245,9 @@ const DashboardPage = () => {
               <strong>{formatCurrency(item.total)}</strong>
             </div>
           ))}
+          {fixedLevels.length === 0 && <p className="muted">Ingen registrerte utgifter ennå.</p>}
         </div>
-        <div className="card">
+        <div className="card insight-card glow-rose">
           <h3>Bindinger neste 90 dager</h3>
           {bindingSoon.length === 0 && <p className="muted">Ingen bindinger som utløper.</p>}
           {bindingSoon.map((item) => (
@@ -189,24 +266,21 @@ const DashboardPage = () => {
         </div>
       </div>
 
-      <div className="section-header">
-        <h2>Månedlige bevegelser</h2>
-      </div>
-      <div className="card">
+      <div className="card insight-card glow-sand">
+        <div className="section-header compact">
+          <h2>Månedlige bevegelser</h2>
+        </div>
         <Line data={lineData} />
       </div>
 
       {Object.keys(summary.tagTotals).length > 0 && (
-        <>
-          <div className="section-header">
+        <div className="card insight-card glow-lilac">
+          <div className="section-header compact">
             <h2>Tag-analyse</h2>
           </div>
-          <div className="card">
-            <Bar data={tagBarData} />
-          </div>
-        </>
+          <Bar data={tagBarData} />
+        </div>
       )}
-
     </div>
   );
 };
