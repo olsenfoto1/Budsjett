@@ -388,7 +388,7 @@ app.get('/api/dashboard', (req, res) => {
   }, {});
 
   const fixedCategoryTotalsMap = {};
-  fixedExpenses.forEach((expense) => {
+  filteredFixedExpenses.forEach((expense) => {
     const key = expense.category || 'Annet';
     if (!fixedCategoryTotalsMap[key]) fixedCategoryTotalsMap[key] = 0;
     fixedCategoryTotalsMap[key] += expense.amountPerMonth || 0;
@@ -402,7 +402,7 @@ app.get('/api/dashboard', (req, res) => {
     .sort((a, b) => b.total - a.total);
 
   const fixedLevelTotalsMap = {};
-  fixedExpenses.forEach((expense) => {
+  filteredFixedExpenses.forEach((expense) => {
     const key = expense.level || 'Må-ha';
     if (!fixedLevelTotalsMap[key]) fixedLevelTotalsMap[key] = 0;
     fixedLevelTotalsMap[key] += expense.amountPerMonth || 0;
