@@ -271,13 +271,23 @@ const FixedExpensesPage = () => {
   }, [ownerProfiles]);
 
   const effectiveOwner = selectedOwner ?? (defaultOwner || null);
+  const availabilityExpenses = useMemo(() => {
+    if (!effectiveOwner) return expenses;
+    return expenses.filter((expense) => (expense.owners || []).includes(effectiveOwner));
+  }, [expenses, effectiveOwner]);
+
+  const availabilityTotalPerMonth = useMemo(
+    () => availabilityExpenses.reduce((sum, expense) => sum + (Number(expense.amountPerMonth) || 0), 0),
+    [availabilityExpenses]
+  );
+
   const activeIncome = effectiveOwner ? ownerIncomeMap.get(effectiveOwner) : monthlyNetIncome;
   const hasIncomeValue = typeof activeIncome === 'number' && Number.isFinite(activeIncome);
-  const freeAfterFixed = hasIncomeValue ? activeIncome - totalPerMonth : null;
+  const freeAfterFixed = hasIncomeValue ? activeIncome - availabilityTotalPerMonth : null;
   const netIncomeLoaded = settingsLoaded;
   const luxuryTotal = levelTotals.find((item) => item.level === 'Luksus')?.total || 0;
   const missingIncomeForOwner = settingsLoaded && effectiveOwner && !hasIncomeValue;
-  const filterDescription = selectedOwner ? `utgiftene til ${selectedOwner}` : 'alle faste utgifter';
+  const filterDescription = effectiveOwner ? `utgiftene til ${effectiveOwner}` : 'alle faste utgifter';
   const incomeSourceDescription = effectiveOwner ? `${effectiveOwner} sin netto inntekt` : 'netto inntekt';
   const showingDefaultOwnerIncome = !selectedOwner && !!defaultOwner;
 
