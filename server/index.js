@@ -231,6 +231,15 @@ app.post('/api/faste-utgifter', (req, res) => {
   res.status(201).json(expense);
 });
 
+app.post('/api/faste-utgifter/bulk-owners', (req, res) => {
+  const owners = normalizeOwnersInput(req.body.owners ?? req.body.owner ?? '');
+  if (!owners.length) {
+    return res.status(400).json({ error: 'Minst én eier må oppgis.' });
+  }
+  const result = db.bulkAddOwnersToFixedExpenses(owners);
+  res.json(result);
+});
+
 app.put('/api/faste-utgifter/:id', (req, res) => {
   const { id } = req.params;
   const { category, level, noticePeriodMonths, owners } = req.body;

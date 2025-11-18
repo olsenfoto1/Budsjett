@@ -43,6 +43,10 @@ const FixedExpensesPage = () => {
   const [categoryOptions, setCategoryOptions] = useState(FALLBACK_CATEGORY_OPTIONS);
   const [categoryError, setCategoryError] = useState('');
   const [isLoadingCategories, setIsLoadingCategories] = useState(false);
+  const [bulkOwnersInput, setBulkOwnersInput] = useState('');
+  const [bulkOwnersError, setBulkOwnersError] = useState('');
+  const [bulkOwnersSuccess, setBulkOwnersSuccess] = useState('');
+  const [isBulkUpdatingOwners, setIsBulkUpdatingOwners] = useState(false);
   const availableCategories = useMemo(() => {
     if (!form.category || categoryOptions.includes(form.category)) {
       return categoryOptions;
@@ -238,6 +242,29 @@ const FixedExpensesPage = () => {
     }
   };
 
+  const handleBulkAddOwners = async (event) => {
+    event.preventDefault();
+    setBulkOwnersSuccess('');
+    const trimmedValue = bulkOwnersInput.trim();
+    if (!trimmedValue) {
+      setBulkOwnersError('Skriv inn minst én eier.');
+      return;
+    }
+
+    try {
+      setIsBulkUpdatingOwners(true);
+      setBulkOwnersError('');
+      await api.bulkAddOwnersToFixedExpenses(trimmedValue);
+      setBulkOwnersSuccess('Eier(e) lagt til');
+      setBulkOwnersInput('');
+      fetchExpenses();
+    } catch (err) {
+      setBulkOwnersError(err.message);
+    } finally {
+      setIsBulkUpdatingOwners(false);
+    }
+  };
+
   const simulation = useMemo(() => {
     if (!simulatedExpense) return null;
     const newTotal = totalPerMonth - (simulatedExpense.amountPerMonth || 0);
@@ -426,6 +453,33 @@ const FixedExpensesPage = () => {
             </div>
           </section>
         ))}
+      </div>
+
+      <div className="card" style={{ marginTop: '2rem' }}>
+        <div className="section-header" style={{ marginTop: 0 }}>
+          <div>
+            <h2>Legg til eier på alle faste utgifter</h2>
+            <p className="muted">Skriv inn navn separert med komma for å legge dem til på alle utgifter.</p>
+          </div>
+          {bulkOwnersSuccess && <span className="badge">{bulkOwnersSuccess}</span>}
+        </div>
+        <form className="inline-form" onSubmit={handleBulkAddOwners}>
+          <label htmlFor="bulk-owners-input">Eier(e)</label>
+          <input
+            id="bulk-owners-input"
+            placeholder="F.eks. Ola, Kari"
+            value={bulkOwnersInput}
+            onChange={(e) => {
+              setBulkOwnersInput(e.target.value);
+              if (bulkOwnersError) setBulkOwnersError('');
+              if (bulkOwnersSuccess) setBulkOwnersSuccess('');
+            }}
+          />
+          <button type="submit" disabled={isBulkUpdatingOwners}>
+            {isBulkUpdatingOwners ? 'Oppdaterer…' : 'Legg til på alle'}
+          </button>
+        </form>
+        {bulkOwnersError && <p className="error-text">{bulkOwnersError}</p>}
       </div>
 
       {showForm && (

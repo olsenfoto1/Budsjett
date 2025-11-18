@@ -288,6 +288,37 @@ class Store {
     return expense;
   }
 
+  bulkAddOwnersToFixedExpenses(owners) {
+    if (!Array.isArray(owners) || owners.length === 0) {
+      return { updated: 0, fixedExpenses: this.state.fixedExpenses };
+    }
+
+    const normalizedOwners = owners.map((owner) => owner.trim()).filter(Boolean);
+    if (!normalizedOwners.length) {
+      return { updated: 0, fixedExpenses: this.state.fixedExpenses };
+    }
+
+    let updatedCount = 0;
+    const now = new Date().toISOString();
+    this.state.fixedExpenses = this.state.fixedExpenses.map((expense) => {
+      const existingOwners = Array.isArray(expense.owners)
+        ? expense.owners.map((owner) => owner.trim()).filter(Boolean)
+        : [];
+      const mergedOwners = Array.from(new Set([...existingOwners, ...normalizedOwners]));
+      if (mergedOwners.length !== existingOwners.length) {
+        updatedCount += 1;
+        return { ...expense, owners: mergedOwners, updatedAt: now };
+      }
+      return expense;
+    });
+
+    if (updatedCount > 0) {
+      this.save();
+    }
+
+    return { updated: updatedCount, fixedExpenses: this.state.fixedExpenses };
+  }
+
   updateFixedExpense(id, payload) {
     const index = this.state.fixedExpenses.findIndex((exp) => exp.id === Number(id));
     if (index === -1) return null;
