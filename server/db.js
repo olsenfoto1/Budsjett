@@ -147,7 +147,30 @@ class Store {
   updateCategory(id, payload) {
     const index = this.state.categories.findIndex((cat) => cat.id === Number(id));
     if (index === -1) return null;
-    this.state.categories[index] = { ...this.state.categories[index], ...payload };
+    const current = this.state.categories[index];
+    const updatedCategory = { ...current, ...payload };
+    if (typeof updatedCategory.name === 'string') {
+      updatedCategory.name = updatedCategory.name.trim();
+    }
+    this.state.categories[index] = updatedCategory;
+
+    if (
+      payload.name &&
+      typeof payload.name === 'string' &&
+      payload.name.trim() &&
+      payload.name !== current.name
+    ) {
+      const oldName = current.name;
+      const newName = updatedCategory.name;
+      const now = new Date().toISOString();
+      this.state.fixedExpenses = this.state.fixedExpenses.map((expense) => {
+        if ((expense.category || 'Annet') === oldName) {
+          return { ...expense, category: newName, updatedAt: now };
+        }
+        return expense;
+      });
+    }
+
     this.save();
     return this.state.categories[index];
   }
