@@ -59,6 +59,16 @@ const DashboardPage = () => {
     return <p>Laster...</p>;
   }
 
+  const fixedCategories = summary.fixedExpenseCategoryTotals || [];
+  const fixedLevels = summary.fixedExpenseLevelTotals || [];
+  const bindingSoon = summary.bindingExpirations || [];
+
+  useEffect(() => {
+    setHiddenCategories((current) =>
+      current.filter((category) => fixedCategories.some((item) => item.category === category))
+    );
+  }, [fixedCategories]);
+
   const visibleFixedCategories = useMemo(
     () => fixedCategories.filter((item) => !hiddenCategories.includes(item.category)),
     [fixedCategories, hiddenCategories]
