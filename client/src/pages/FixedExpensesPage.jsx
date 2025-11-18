@@ -370,7 +370,7 @@ const FixedExpensesPage = () => {
           </p>
         </div>
         <div className="card">
-          <h3>Ledig etter faste kostnader</h3>
+          <h3>Tilgjengelig etter faste kostnader</h3>
           {netIncomeLoaded ? (
             <>
               <p className="stat" style={{ color: freeAfterFixed >= 0 ? '#16a34a' : '#dc2626' }}>

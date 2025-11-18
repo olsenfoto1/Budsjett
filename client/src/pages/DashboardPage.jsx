@@ -81,20 +81,36 @@ const DashboardPage = () => {
         }
       : null;
 
+  const monthlyForecast = Array.from({ length: 12 }, (_, index) => {
+    const date = new Date();
+    date.setMonth(date.getMonth() + index);
+    const label = date.toLocaleDateString('no-NO', {
+      month: 'short',
+      year: 'numeric'
+    });
+    const fixedCosts = summary.fixedExpenseTotal || 0;
+    const availableAfterFixed = summary.freeAfterFixed || 0;
+    return {
+      label,
+      fixedCosts,
+      availableAfterFixed
+    };
+  });
+
   const lineData = {
-    labels: summary.monthly.map((item) => item.period),
+    labels: monthlyForecast.map((item) => item.label),
     datasets: [
       {
-        label: 'Inntekt',
-        data: summary.monthly.map((item) => item.income),
-        borderColor: '#22c55e',
-        backgroundColor: 'rgba(34,197,94,0.2)'
+        label: 'Faste kostnader',
+        data: monthlyForecast.map((item) => item.fixedCosts),
+        borderColor: '#6366f1',
+        backgroundColor: 'rgba(99,102,241,0.15)'
       },
       {
-        label: 'Utgifter',
-        data: summary.monthly.map((item) => item.expenses),
-        borderColor: '#ef4444',
-        backgroundColor: 'rgba(239,68,68,0.2)'
+        label: 'Tilgjengelig etter faste kostnader',
+        data: monthlyForecast.map((item) => item.availableAfterFixed),
+        borderColor: '#16a34a',
+        backgroundColor: 'rgba(22,163,74,0.15)'
       }
     ]
   };
@@ -139,7 +155,7 @@ const DashboardPage = () => {
           </form>
         </div>
         <div className="card">
-          <h3>Ledig etter faste kostnader</h3>
+          <h3>Tilgjengelig etter faste kostnader</h3>
           <p className="stat" style={{ color: summary.freeAfterFixed >= 0 ? '#16a34a' : '#dc2626' }}>
             {formatCurrency(summary.freeAfterFixed)}
           </p>
