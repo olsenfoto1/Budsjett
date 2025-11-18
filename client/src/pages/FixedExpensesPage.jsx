@@ -339,7 +339,7 @@ const FixedExpensesPage = () => {
   const netIncomeLoaded = monthlyNetIncome !== null;
 
   return (
-    <div>
+    <div className="fixed-expenses-page">
       <div className="section-header">
           <div>
             <h2>Faste utgifter</h2>
@@ -361,7 +361,7 @@ const FixedExpensesPage = () => {
         {error && <p className="error-text">{error}</p>}
 
       <div className="card-grid">
-        <div className="card">
+        <div className="card insight-card glow-lilac">
           <h3>Totale faste kostnader per måned</h3>
           <p className="stat">{formatCurrency(totalPerMonth)}</p>
           <p className="muted">
@@ -369,7 +369,7 @@ const FixedExpensesPage = () => {
             {selectedOwner && ` (av ${expenses.length})`}
           </p>
         </div>
-        <div className="card">
+        <div className="card insight-card glow-mint">
           <h3>Tilgjengelig etter faste kostnader</h3>
           {netIncomeLoaded ? (
             <>
@@ -385,7 +385,7 @@ const FixedExpensesPage = () => {
           )}
           {settingsError && <p className="error-text">{settingsError}</p>}
         </div>
-        <div className="card">
+        <div className="card insight-card glow-amber">
           <h3>Sum per kategori</h3>
           <div className="pill-list">
             {categoryTotals.length === 0 && <p className="muted">Ingen registrerte utgifter ennå.</p>}
@@ -397,7 +397,7 @@ const FixedExpensesPage = () => {
             ))}
           </div>
         </div>
-        <div className="card">
+        <div className="card insight-card glow-rose">
           <h3>Binding utløper snart</h3>
           {bindingSoon.length === 0 && <p className="muted">Ingen bindinger de neste 90 dagene.</p>}
           {bindingSoon.map((item) => (
@@ -416,7 +416,7 @@ const FixedExpensesPage = () => {
         </div>
       </div>
 
-      <div className="card" style={{ marginTop: '1.5rem' }}>
+      <div className="card insight-card glow-ocean chart-card">
         <div className="section-header" style={{ marginTop: 0 }}>
           <h2>Fordeling per kategori</h2>
           {doughnutData && <span className="badge">{categoryTotals.length} kategorier</span>}
@@ -436,7 +436,7 @@ const FixedExpensesPage = () => {
         )}
       </div>
 
-      <div className="card analysis-card">
+      <div className="card insight-card glow-sky analysis-card">
         <h3>Må-ha / Kjekt å ha / Luksus</h3>
         <div className="analysis-grid">
           {levelTotals.map((item) => (
@@ -530,7 +530,7 @@ const FixedExpensesPage = () => {
         ))}
       </div>
 
-      <div className="card" style={{ marginTop: '2rem' }}>
+      <div className="card insight-card glow-sand bulk-update-card">
         <div className="section-header" style={{ marginTop: 0 }}>
           <div>
             <h2>Legg til eier på alle faste utgifter</h2>

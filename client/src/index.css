@@ -205,6 +205,108 @@ main {
   transition: transform 0.25s ease, box-shadow 0.25s ease;
 }
 
+.fixed-expenses-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.fixed-expenses-page .section-header:first-of-type {
+  margin-bottom: 1.25rem;
+}
+
+.fixed-expenses-page .insight-card {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  border-radius: 1.65rem;
+  border: 1px solid rgba(148, 163, 184, 0.5);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.75));
+  box-shadow: 0 25px 60px rgba(15, 23, 42, 0.12);
+}
+
+.fixed-expenses-page .insight-card::before,
+.fixed-expenses-page .insight-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  z-index: -1;
+  transition: opacity 0.3s ease;
+}
+
+.fixed-expenses-page .insight-card::before {
+  background: var(--tile-gradient, transparent);
+  opacity: 0.75;
+}
+
+.fixed-expenses-page .insight-card::after {
+  background: radial-gradient(circle at 15% 20%, var(--glow-color, rgba(37, 99, 235, 0.3)), transparent 60%);
+  opacity: 0.9;
+}
+
+.fixed-expenses-page .insight-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 35px 80px rgba(15, 23, 42, 0.18);
+}
+
+.fixed-expenses-page .glow-lilac {
+  --tile-gradient: linear-gradient(135deg, rgba(129, 140, 248, 0.22), rgba(59, 130, 246, 0.12));
+  --glow-color: rgba(129, 140, 248, 0.45);
+}
+
+.fixed-expenses-page .glow-mint {
+  --tile-gradient: linear-gradient(135deg, rgba(16, 185, 129, 0.18), rgba(45, 212, 191, 0.12));
+  --glow-color: rgba(45, 212, 191, 0.45);
+}
+
+.fixed-expenses-page .glow-amber {
+  --tile-gradient: linear-gradient(135deg, rgba(251, 191, 36, 0.28), rgba(248, 113, 113, 0.12));
+  --glow-color: rgba(251, 146, 60, 0.45);
+}
+
+.fixed-expenses-page .glow-rose {
+  --tile-gradient: linear-gradient(135deg, rgba(248, 113, 113, 0.28), rgba(244, 114, 182, 0.15));
+  --glow-color: rgba(244, 114, 182, 0.5);
+}
+
+.fixed-expenses-page .glow-ocean {
+  --tile-gradient: linear-gradient(135deg, rgba(14, 165, 233, 0.22), rgba(99, 102, 241, 0.12));
+  --glow-color: rgba(14, 165, 233, 0.45);
+}
+
+.fixed-expenses-page .glow-sky {
+  --tile-gradient: linear-gradient(135deg, rgba(191, 219, 254, 0.35), rgba(199, 210, 254, 0.2));
+  --glow-color: rgba(96, 165, 250, 0.45);
+}
+
+.fixed-expenses-page .glow-sand {
+  --tile-gradient: linear-gradient(135deg, rgba(253, 224, 71, 0.2), rgba(248, 196, 113, 0.12));
+  --glow-color: rgba(251, 191, 36, 0.45);
+}
+
+:root[data-theme='dark'] .fixed-expenses-page .insight-card {
+  border-color: rgba(147, 197, 253, 0.25);
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.92), rgba(15, 23, 42, 0.78));
+  box-shadow: 0 25px 55px rgba(2, 6, 23, 0.9);
+}
+
+:root[data-theme='dark'] .fixed-expenses-page .insight-card::before {
+  opacity: 0.6;
+}
+
+:root[data-theme='dark'] .fixed-expenses-page .insight-card::after {
+  background: radial-gradient(circle at 15% 20%, var(--glow-color, rgba(59, 130, 246, 0.55)), transparent 55%);
+}
+
+.fixed-expenses-page .chart-card {
+  margin-top: 1.5rem;
+}
+
+.fixed-expenses-page .bulk-update-card {
+  margin-top: 2rem;
+}
+
 .card:hover {
   transform: translateY(-4px);
   box-shadow: var(--card-shadow-hover);
