@@ -92,7 +92,9 @@ const FixedExpensesPage = () => {
   const [bulkOwnersSuccess, setBulkOwnersSuccess] = useState('');
   const [isBulkUpdatingOwners, setIsBulkUpdatingOwners] = useState(false);
   const [monthlyNetIncome, setMonthlyNetIncome] = useState(null);
+  const [ownerProfiles, setOwnerProfiles] = useState([]);
   const [settingsError, setSettingsError] = useState('');
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const availableCategories = useMemo(() => {
     if (!form.category || categoryOptions.includes(form.category)) {
       return categoryOptions;
@@ -120,11 +122,16 @@ const FixedExpensesPage = () => {
         const settings = await api.getSettings();
         if (!isMounted) return;
         setMonthlyNetIncome(Number(settings.monthlyNetIncome) || 0);
+        setOwnerProfiles(Array.isArray(settings.ownerProfiles) ? settings.ownerProfiles : []);
         setSettingsError('');
       } catch (err) {
         if (!isMounted) return;
         console.error('Kunne ikke hente innstillinger', err);
-        setSettingsError('Kunne ikke hente netto inntekt.');
+        setSettingsError('Kunne ikke hente innstillinger.');
+      } finally {
+        if (isMounted) {
+          setSettingsLoaded(true);
+        }
       }
     };
     loadSettings();
@@ -247,6 +254,27 @@ const FixedExpensesPage = () => {
     };
   }, [categoryTotals]);
 
+  const ownerIncomeMap = useMemo(() => {
+    const map = new Map();
+    ownerProfiles.forEach((profile) => {
+      if (!profile?.name) return;
+      const value = Number(profile.monthlyNetIncome);
+      if (Number.isFinite(value)) {
+        map.set(profile.name, value);
+      }
+    });
+    return map;
+  }, [ownerProfiles]);
+
+  const activeIncome = selectedOwner ? ownerIncomeMap.get(selectedOwner) : monthlyNetIncome;
+  const hasIncomeValue = typeof activeIncome === 'number' && Number.isFinite(activeIncome);
+  const freeAfterFixed = hasIncomeValue ? activeIncome - totalPerMonth : null;
+  const netIncomeLoaded = settingsLoaded;
+  const luxuryTotal = levelTotals.find((item) => item.level === 'Luksus')?.total || 0;
+  const missingIncomeForOwner = settingsLoaded && selectedOwner && !hasIncomeValue;
+  const filterDescription = selectedOwner ? `utgiftene til ${selectedOwner}` : 'alle faste utgifter';
+  const incomeSourceDescription = selectedOwner ? `${selectedOwner} sin netto inntekt` : 'netto inntekt';
+
   const handleOpenForm = (expense) => {
     // Hent alltid siste kategorier når skjemaet åpnes
     loadCategories();
@@ -355,9 +383,7 @@ const FixedExpensesPage = () => {
     };
   }, [simulatedExpense, totalPerMonth]);
 
-  const luxuryTotal = levelTotals.find((item) => item.level === 'Luksus')?.total || 0;
-  const freeAfterFixed = (monthlyNetIncome ?? 0) - totalPerMonth;
-  const netIncomeLoaded = monthlyNetIncome !== null;
+
 
   return (
     <div className="fixed-expenses-page">
@@ -392,17 +418,19 @@ const FixedExpensesPage = () => {
         </div>
         <div className="card insight-card glow-mint">
           <h3>Tilgjengelig etter faste kostnader</h3>
-          {netIncomeLoaded ? (
+          {!netIncomeLoaded && <p className="muted">Henter netto inntekt…</p>}
+          {netIncomeLoaded && hasIncomeValue && (
             <>
-              <p className="stat" style={{ color: freeAfterFixed >= 0 ? '#16a34a' : '#dc2626' }}>
+              <p className="stat" style={{ color: (freeAfterFixed ?? 0) >= 0 ? '#16a34a' : '#dc2626' }}>
                 {formatCurrency(freeAfterFixed)}
               </p>
               <p className="muted">
-                Basert på netto inntekt og {selectedOwner ? `utgiftene til ${selectedOwner}` : 'alle faste utgifter'}.
+                Basert på {incomeSourceDescription} og {filterDescription}.
               </p>
             </>
-          ) : (
-            <p className="muted">Henter netto inntekt…</p>
+          )}
+          {missingIncomeForOwner && (
+            <p className="muted">Legg inn netto inntekt for {selectedOwner} under Innstillinger.</p>
           )}
           {settingsError && <p className="error-text">{settingsError}</p>}
         </div>

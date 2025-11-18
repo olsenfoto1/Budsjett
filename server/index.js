@@ -279,12 +279,38 @@ app.get('/api/settings', (req, res) => {
 });
 
 app.put('/api/settings', (req, res) => {
-  const { monthlyNetIncome = 0 } = req.body;
-  const value = Number(monthlyNetIncome);
-  if (!Number.isFinite(value) || value < 0) {
-    return res.status(400).json({ error: 'Netto inntekt må være et ikke-negativt tall.' });
+  const { monthlyNetIncome, ownerProfiles } = req.body || {};
+  const update = {};
+
+  if (monthlyNetIncome !== undefined) {
+    const value = Number(monthlyNetIncome);
+    if (!Number.isFinite(value) || value < 0) {
+      return res.status(400).json({ error: 'Netto inntekt må være et ikke-negativt tall.' });
+    }
+    update.monthlyNetIncome = value;
   }
-  const updated = db.updateSettings({ monthlyNetIncome: value });
+
+  if (ownerProfiles !== undefined) {
+    if (!Array.isArray(ownerProfiles)) {
+      return res.status(400).json({ error: 'Personer må sendes som en liste.' });
+    }
+    const sanitizedProfiles = [];
+    for (const profile of ownerProfiles) {
+      if (!profile || typeof profile.name !== 'string') continue;
+      const name = profile.name.trim();
+      if (!name) continue;
+      const income = Number(profile.monthlyNetIncome);
+      if (!Number.isFinite(income) || income < 0) {
+        return res
+          .status(400)
+          .json({ error: 'Netto inntekt for hver person må være et ikke-negativt tall.' });
+      }
+      sanitizedProfiles.push({ name, monthlyNetIncome: income });
+    }
+    update.ownerProfiles = sanitizedProfiles;
+  }
+
+  const updated = db.updateSettings(update);
   res.json(updated);
 });
 

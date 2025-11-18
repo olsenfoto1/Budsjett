@@ -8,7 +8,8 @@ if (!fs.existsSync(dataDir)) {
 const dataPath = path.join(dataDir, 'store.json');
 
 const DEFAULT_SETTINGS = {
-  monthlyNetIncome: 0
+  monthlyNetIncome: 0,
+  ownerProfiles: []
 };
 
 const defaultData = {
@@ -61,6 +62,7 @@ class Store {
       this.state.settings = { ...DEFAULT_SETTINGS };
     } else {
       this.state.settings.monthlyNetIncome = Number(this.state.settings.monthlyNetIncome) || 0;
+      this.state.settings.ownerProfiles = this.normalizeOwnerProfiles(this.state.settings.ownerProfiles || []);
     }
 
     if (!Array.isArray(this.state.fixedExpenses)) {
@@ -115,6 +117,20 @@ class Store {
       createdAt: raw.createdAt || now,
       updatedAt: raw.updatedAt || now
     };
+  }
+
+  normalizeOwnerProfiles(rawProfiles = []) {
+    if (!Array.isArray(rawProfiles)) return [];
+    const map = new Map();
+    rawProfiles.forEach((profile) => {
+      if (!profile || typeof profile.name !== 'string') return;
+      const name = profile.name.trim();
+      if (!name) return;
+      const value = Number(profile.monthlyNetIncome);
+      const income = Number.isFinite(value) && value >= 0 ? value : 0;
+      map.set(name, income);
+    });
+    return Array.from(map.entries()).map(([name, monthlyNetIncome]) => ({ name, monthlyNetIncome }));
   }
 
   nextId(key) {
@@ -382,17 +398,30 @@ class Store {
   }
 
   getSettings() {
-    return this.state.settings || { ...DEFAULT_SETTINGS };
+    if (!this.state.settings) {
+      this.state.settings = { ...DEFAULT_SETTINGS };
+    }
+    if (!Array.isArray(this.state.settings.ownerProfiles)) {
+      this.state.settings.ownerProfiles = [];
+    }
+    return this.state.settings;
   }
 
   updateSettings(payload) {
-    this.state.settings = {
-      ...this.getSettings(),
-      ...payload,
-      monthlyNetIncome: Number(
-        payload.monthlyNetIncome ?? this.state.settings?.monthlyNetIncome ?? DEFAULT_SETTINGS.monthlyNetIncome
-      ) || 0
+    const current = this.getSettings();
+    const next = {
+      ...current,
+      monthlyNetIncome:
+        Number(payload.monthlyNetIncome ?? current.monthlyNetIncome ?? DEFAULT_SETTINGS.monthlyNetIncome) || 0
     };
+
+    if (payload.ownerProfiles !== undefined) {
+      next.ownerProfiles = this.normalizeOwnerProfiles(payload.ownerProfiles);
+    } else if (!Array.isArray(next.ownerProfiles)) {
+      next.ownerProfiles = [];
+    }
+
+    this.state.settings = next;
     this.save();
     return this.state.settings;
   }
@@ -434,7 +463,8 @@ class Store {
 
     const settingsPayload = data.settings || {};
     const settings = {
-      monthlyNetIncome: Number(settingsPayload.monthlyNetIncome) || 0
+      monthlyNetIncome: Number(settingsPayload.monthlyNetIncome) || 0,
+      ownerProfiles: this.normalizeOwnerProfiles(settingsPayload.ownerProfiles || settingsPayload.ownerprofiles)
     };
 
     const counters = data.counters || {
