@@ -82,7 +82,8 @@ const FixedExpensesPage = () => {
   const [error, setError] = useState('');
   const [simulatedExpense, setSimulatedExpense] = useState(null);
   const handleCloseSimulation = useCallback(() => setSimulatedExpense(null), []);
-  const [selectedOwner, setSelectedOwner] = useState(null);
+  const [selectedOwners, setSelectedOwners] = useState([]);
+  const [hasManualOwnerSelection, setHasManualOwnerSelection] = useState(false);
   const [categoryOptions, setCategoryOptions] = useState(FALLBACK_CATEGORY_OPTIONS);
   const [categoryColorMap, setCategoryColorMap] = useState(() => ({ ...FALLBACK_CATEGORY_COLORS }));
   const [categoryError, setCategoryError] = useState('');
@@ -95,7 +96,7 @@ const FixedExpensesPage = () => {
   const [ownerProfiles, setOwnerProfiles] = useState([]);
   const [settingsError, setSettingsError] = useState('');
   const [settingsLoaded, setSettingsLoaded] = useState(false);
-  const [defaultOwner, setDefaultOwner] = useState('');
+  const [defaultOwners, setDefaultOwners] = useState([]);
   const availableCategories = useMemo(() => {
     if (!form.category || categoryOptions.includes(form.category)) {
       return categoryOptions;
@@ -124,9 +125,12 @@ const FixedExpensesPage = () => {
         if (!isMounted) return;
         setMonthlyNetIncome(Number(settings.monthlyNetIncome) || 0);
         setOwnerProfiles(Array.isArray(settings.ownerProfiles) ? settings.ownerProfiles : []);
-        setDefaultOwner(
-          typeof settings.defaultFixedExpensesOwner === 'string' ? settings.defaultFixedExpensesOwner : ''
-        );
+        const defaultOwnerList = Array.isArray(settings.defaultFixedExpensesOwners)
+          ? settings.defaultFixedExpensesOwners
+          : typeof settings.defaultFixedExpensesOwner === 'string' && settings.defaultFixedExpensesOwner.trim()
+          ? [settings.defaultFixedExpensesOwner.trim()]
+          : [];
+        setDefaultOwners(defaultOwnerList);
         setSettingsError('');
       } catch (err) {
         if (!isMounted) return;
@@ -178,10 +182,17 @@ const FixedExpensesPage = () => {
     loadCategories();
   }, [loadCategories]);
 
+  const activeOwners = useMemo(
+    () => (hasManualOwnerSelection ? selectedOwners : defaultOwners),
+    [hasManualOwnerSelection, selectedOwners, defaultOwners]
+  );
+
   const filteredExpenses = useMemo(() => {
-    if (!selectedOwner) return expenses;
-    return expenses.filter((expense) => (expense.owners || []).includes(selectedOwner));
-  }, [expenses, selectedOwner]);
+    if (!activeOwners.length) return expenses;
+    return expenses.filter((expense) =>
+      (expense.owners || []).some((owner) => activeOwners.includes(owner))
+    );
+  }, [expenses, activeOwners]);
 
   const totalPerMonth = useMemo(
     () => filteredExpenses.reduce((sum, expense) => sum + (Number(expense.amountPerMonth) || 0), 0),
@@ -270,26 +281,31 @@ const FixedExpensesPage = () => {
     return map;
   }, [ownerProfiles]);
 
-  const effectiveOwner = selectedOwner ?? (defaultOwner || null);
-  const availabilityExpenses = useMemo(() => {
-    if (!effectiveOwner) return expenses;
-    return expenses.filter((expense) => (expense.owners || []).includes(effectiveOwner));
-  }, [expenses, effectiveOwner]);
-
   const availabilityTotalPerMonth = useMemo(
-    () => availabilityExpenses.reduce((sum, expense) => sum + (Number(expense.amountPerMonth) || 0), 0),
-    [availabilityExpenses]
+    () => filteredExpenses.reduce((sum, expense) => sum + (Number(expense.amountPerMonth) || 0), 0),
+    [filteredExpenses]
   );
 
-  const activeIncome = effectiveOwner ? ownerIncomeMap.get(effectiveOwner) : monthlyNetIncome;
+  const activeIncome = activeOwners.length
+    ? activeOwners.reduce((sum, owner) => sum + (ownerIncomeMap.get(owner) || 0), 0)
+    : monthlyNetIncome;
   const hasIncomeValue = typeof activeIncome === 'number' && Number.isFinite(activeIncome);
   const freeAfterFixed = hasIncomeValue ? activeIncome - availabilityTotalPerMonth : null;
   const netIncomeLoaded = settingsLoaded;
   const luxuryTotal = levelTotals.find((item) => item.level === 'Luksus')?.total || 0;
-  const missingIncomeForOwner = settingsLoaded && effectiveOwner && !hasIncomeValue;
-  const filterDescription = effectiveOwner ? `utgiftene til ${effectiveOwner}` : 'alle faste utgifter';
-  const incomeSourceDescription = effectiveOwner ? `${effectiveOwner} sin netto inntekt` : 'netto inntekt';
-  const showingDefaultOwnerIncome = !selectedOwner && !!defaultOwner;
+  const missingIncomeOwners =
+    settingsLoaded && activeOwners.length > 0
+      ? activeOwners.filter((owner) => !ownerIncomeMap.has(owner))
+      : [];
+  const missingIncomeForOwner = missingIncomeOwners.length > 0;
+  const filterDescription = activeOwners.length
+    ? `utgiftene til ${activeOwners.join(', ')}`
+    : 'alle faste utgifter';
+  const incomeSourceDescription = activeOwners.length
+    ? `${activeOwners.join(', ')} sin samlede netto inntekt`
+    : 'netto inntekt';
+  const showingDefaultOwnerIncome = !hasManualOwnerSelection && defaultOwners.length > 0;
+  const manualFilterActive = hasManualOwnerSelection && activeOwners.length > 0;
 
   const handleOpenForm = (expense) => {
     // Hent alltid siste kategorier når skjemaet åpnes
@@ -319,6 +335,25 @@ const FixedExpensesPage = () => {
     setForm(createEmptyForm(categoryOptions[0] || FALLBACK_CATEGORY_OPTIONS[0]));
     setEditingId(null);
   }, [categoryOptions]);
+
+  const handleToggleOwnerFilter = useCallback(
+    (owner) => {
+      setSelectedOwners((current) => {
+        const baseline = hasManualOwnerSelection ? current : defaultOwners;
+        if (baseline.includes(owner)) {
+          return baseline.filter((item) => item !== owner);
+        }
+        return [...baseline, owner];
+      });
+      setHasManualOwnerSelection(true);
+    },
+    [defaultOwners, hasManualOwnerSelection]
+  );
+
+  const clearOwnerFilter = useCallback(() => {
+    setSelectedOwners([]);
+    setHasManualOwnerSelection(false);
+  }, []);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -404,20 +439,20 @@ const FixedExpensesPage = () => {
   return (
     <div className="fixed-expenses-page">
       <div className="section-header">
-          <div>
-            <h2>Faste utgifter</h2>
-            {selectedOwner && (
-              <div className="filter-indicator">
-                <span className="badge">Filtrert på {selectedOwner}</span>
-              </div>
-            )}
-          </div>
-          <div className="section-actions">
-            {selectedOwner && (
-              <button className="secondary" onClick={() => setSelectedOwner(null)}>
-                Fjern filter
-              </button>
-            )}
+        <div>
+          <h2>Faste utgifter</h2>
+          {manualFilterActive && (
+            <div className="filter-indicator">
+              <span className="badge">Filtrert på {activeOwners.join(', ')}</span>
+            </div>
+          )}
+        </div>
+        <div className="section-actions">
+          {hasManualOwnerSelection && (
+            <button className="secondary" onClick={clearOwnerFilter}>
+              Fjern filter
+            </button>
+          )}
             <button onClick={() => handleOpenForm(null)}>Ny fast utgift</button>
           </div>
         </div>
@@ -429,7 +464,7 @@ const FixedExpensesPage = () => {
           <p className="stat">{formatCurrency(totalPerMonth)}</p>
           <p className="muted">
             {filteredExpenses.length} aktive avtaler
-            {selectedOwner && ` (av ${expenses.length})`}
+            {manualFilterActive && ` (av ${expenses.length})`}
           </p>
         </div>
         <div className="card insight-card glow-mint">
@@ -442,13 +477,13 @@ const FixedExpensesPage = () => {
               </p>
               <p className="muted">
                 Basert på {incomeSourceDescription} og {filterDescription}.
-                {showingDefaultOwnerIncome && ' (Standardvalgt tag fra innstillinger.)'}
+                {showingDefaultOwnerIncome && ' (Standardvalg fra innstillinger.)'}
               </p>
             </>
           )}
           {missingIncomeForOwner && (
             <p className="muted">
-              Legg inn netto inntekt for {effectiveOwner} under Innstillinger.
+              Legg inn netto inntekt for {missingIncomeOwners.join(', ')} under Innstillinger.
             </p>
           )}
           {settingsError && <p className="error-text">{settingsError}</p>}
@@ -524,7 +559,7 @@ const FixedExpensesPage = () => {
         <h2>Alle faste utgifter</h2>
         <span>
           {filteredExpenses.length} avtaler
-          {selectedOwner && ` (av ${expenses.length})`}
+          {manualFilterActive && ` (av ${expenses.length})`}
         </span>
       </div>
       <div className="category-sections">
@@ -563,11 +598,9 @@ const FixedExpensesPage = () => {
                             {(expense.owners || []).map((owner) => (
                               <button
                                 type="button"
-                                className={`chip chip-button${selectedOwner === owner ? ' chip-active' : ''}`}
+                                className={`chip chip-button${activeOwners.includes(owner) ? ' chip-active' : ''}`}
                                 key={owner}
-                                onClick={() =>
-                                  setSelectedOwner((current) => (current === owner ? null : owner))
-                                }
+                                onClick={() => handleToggleOwnerFilter(owner)}
                               >
                                 {owner}
                               </button>
