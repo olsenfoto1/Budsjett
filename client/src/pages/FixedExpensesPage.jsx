@@ -74,6 +74,7 @@ const FixedExpensesPage = () => {
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState('');
   const [simulatedExpense, setSimulatedExpense] = useState(null);
+  const handleCloseSimulation = useCallback(() => setSimulatedExpense(null), []);
   const [selectedOwner, setSelectedOwner] = useState(null);
   const [categoryOptions, setCategoryOptions] = useState(FALLBACK_CATEGORY_OPTIONS);
   const [categoryError, setCategoryError] = useState('');
@@ -249,11 +250,11 @@ const FixedExpensesPage = () => {
     setShowForm(true);
   };
 
-  const closeForm = () => {
+  const closeForm = useCallback(() => {
     setShowForm(false);
     setForm(createEmptyForm(categoryOptions[0] || FALLBACK_CATEGORY_OPTIONS[0]));
     setEditingId(null);
-  };
+  }, [categoryOptions]);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -631,7 +632,7 @@ const FixedExpensesPage = () => {
       )}
 
       {simulation && (
-        <Modal onClose={() => setSimulatedExpense(null)}>
+        <Modal onClose={handleCloseSimulation}>
           <h3>Simuler oppsigelse</h3>
           <p>
             <strong>{simulatedExpense.name}</strong>
