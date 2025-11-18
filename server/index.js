@@ -279,7 +279,8 @@ app.get('/api/settings', (req, res) => {
 });
 
 app.put('/api/settings', (req, res) => {
-  const { monthlyNetIncome, ownerProfiles, defaultFixedExpensesOwner } = req.body || {};
+  const { monthlyNetIncome, ownerProfiles, defaultFixedExpensesOwner, defaultFixedExpensesOwners } =
+    req.body || {};
   const update = {};
 
   if (monthlyNetIncome !== undefined) {
@@ -310,11 +311,28 @@ app.put('/api/settings', (req, res) => {
     update.ownerProfiles = sanitizedProfiles;
   }
 
-  if (defaultFixedExpensesOwner !== undefined) {
+  if (defaultFixedExpensesOwners !== undefined) {
+    if (!Array.isArray(defaultFixedExpensesOwners)) {
+      return res
+        .status(400)
+        .json({ error: 'Standardvisning må være en liste med navn.' });
+    }
+    const sanitized = Array.from(
+      new Set(
+        defaultFixedExpensesOwners
+          .filter((name) => typeof name === 'string')
+          .map((name) => name.trim())
+          .filter(Boolean)
+      )
+    );
+    update.defaultFixedExpensesOwners = sanitized;
+  }
+
+  if (defaultFixedExpensesOwner !== undefined && defaultFixedExpensesOwners === undefined) {
     if (defaultFixedExpensesOwner === null || defaultFixedExpensesOwner === '') {
-      update.defaultFixedExpensesOwner = '';
+      update.defaultFixedExpensesOwners = [];
     } else if (typeof defaultFixedExpensesOwner === 'string') {
-      update.defaultFixedExpensesOwner = defaultFixedExpensesOwner.trim();
+      update.defaultFixedExpensesOwners = [defaultFixedExpensesOwner.trim()];
     } else {
       return res
         .status(400)
@@ -351,12 +369,13 @@ app.get('/api/dashboard', (req, res) => {
     }
     return map;
   }, new Map());
-  const defaultOwner =
-    typeof settings.defaultFixedExpensesOwner === 'string'
-      ? settings.defaultFixedExpensesOwner.trim()
-      : '';
-  const filteredFixedExpenses = defaultOwner
-    ? fixedExpenses.filter((expense) => (expense.owners || []).includes(defaultOwner))
+  const defaultOwners = Array.isArray(settings.defaultFixedExpensesOwners)
+    ? settings.defaultFixedExpensesOwners.filter(Boolean)
+    : [];
+  const filteredFixedExpenses = defaultOwners.length
+    ? fixedExpenses.filter((expense) =>
+        (expense.owners || []).some((owner) => defaultOwners.includes(owner))
+      )
     : fixedExpenses;
   const effectiveFixedExpenseTotal = filteredFixedExpenses.reduce(
     (sum, expense) => sum + (expense.amountPerMonth || 0),
@@ -412,9 +431,14 @@ app.get('/api/dashboard', (req, res) => {
     .sort((a, b) => new Date(a.bindingEndDate) - new Date(b.bindingEndDate));
 
   const monthlyNetIncome = Number(settings.monthlyNetIncome) || 0;
-  const ownerIncome = ownerIncomeMap.get(defaultOwner);
-  const hasOwnerIncome = typeof ownerIncome === 'number' && Number.isFinite(ownerIncome);
-  const activeMonthlyNetIncome = defaultOwner && hasOwnerIncome ? ownerIncome : monthlyNetIncome;
+  const ownersHaveCompleteIncome = defaultOwners.every((owner) => ownerIncomeMap.has(owner));
+  const ownerIncome = defaultOwners.reduce(
+    (sum, owner) => sum + (ownerIncomeMap.get(owner) || 0),
+    0
+  );
+  const activeMonthlyNetIncome = defaultOwners.length && ownersHaveCompleteIncome
+    ? ownerIncome
+    : monthlyNetIncome;
   const freeAfterFixed = activeMonthlyNetIncome - effectiveFixedExpenseTotal;
 
   const categoryTotals = categories.map((category) => ({

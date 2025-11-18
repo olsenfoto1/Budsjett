@@ -12,7 +12,7 @@ const SettingsPage = () => {
   const [ownerError, setOwnerError] = useState('');
   const [newOwnerName, setNewOwnerName] = useState('');
   const [isSavingOwners, setIsSavingOwners] = useState(false);
-  const [defaultOwner, setDefaultOwner] = useState('');
+  const [defaultOwners, setDefaultOwners] = useState([]);
   const [defaultOwnerStatus, setDefaultOwnerStatus] = useState('');
   const [defaultOwnerError, setDefaultOwnerError] = useState('');
   const [isUpdatingDefaultOwner, setIsUpdatingDefaultOwner] = useState(false);
@@ -30,7 +30,12 @@ const SettingsPage = () => {
           }
         });
         setOwnerInputs(normalized);
-        setDefaultOwner(typeof data.defaultFixedExpensesOwner === 'string' ? data.defaultFixedExpensesOwner : '');
+        const defaults = Array.isArray(data.defaultFixedExpensesOwners)
+          ? data.defaultFixedExpensesOwners
+          : typeof data.defaultFixedExpensesOwner === 'string' && data.defaultFixedExpensesOwner.trim()
+          ? [data.defaultFixedExpensesOwner.trim()]
+          : [];
+        setDefaultOwners(defaults);
       } catch (err) {
         if (!isMounted) return;
         setOwnerError('Kunne ikke hente personer: ' + err.message);
@@ -80,11 +85,11 @@ const SettingsPage = () => {
     Object.keys(ownerInputs).forEach((name) => {
       if (name?.trim()) names.add(name);
     });
-    if (defaultOwner?.trim()) {
-      names.add(defaultOwner.trim());
-    }
+    defaultOwners.forEach((name) => {
+      if (name?.trim()) names.add(name.trim());
+    });
     return Array.from(names).sort((a, b) => a.localeCompare(b, 'no'));
-  }, [ownersFromExpenses, ownerInputs, defaultOwner]);
+  }, [ownersFromExpenses, ownerInputs, defaultOwners]);
 
   const handleOwnerIncomeChange = (name, value) => {
     setOwnerInputs((current) => ({ ...current, [name]: value }));
@@ -140,20 +145,49 @@ const SettingsPage = () => {
     }
   };
 
-  const handleSetDefaultOwner = async (name) => {
+  const handleUpdateDefaultOwners = async (owners) => {
     setDefaultOwnerStatus('');
     setDefaultOwnerError('');
     setIsUpdatingDefaultOwner(true);
     try {
-      const payload = { defaultFixedExpensesOwner: name || '' };
+      const sanitized = Array.from(
+        new Set(
+          (owners || [])
+            .filter((name) => typeof name === 'string')
+            .map((name) => name.trim())
+            .filter(Boolean)
+        )
+      );
+      const payload = { defaultFixedExpensesOwners: sanitized };
       const updated = await api.updateSettings(payload);
-      setDefaultOwner(typeof updated.defaultFixedExpensesOwner === 'string' ? updated.defaultFixedExpensesOwner : '');
-      setDefaultOwnerStatus(name ? `${name} er satt som standard for Faste utgifter.` : 'Standardvisning fjernet.');
+      const next = Array.isArray(updated.defaultFixedExpensesOwners)
+        ? updated.defaultFixedExpensesOwners
+        : [];
+      setDefaultOwners(next);
+      if (next.length === 0) {
+        setDefaultOwnerStatus('Standardvisning fjernet.');
+      } else if (next.length === 1) {
+        setDefaultOwnerStatus(`${next[0]} er satt som standard for Faste utgifter.`);
+      } else {
+        setDefaultOwnerStatus(
+          `${next.join(', ')} er satt som standard for Faste utgifter.`
+        );
+      }
     } catch (err) {
       setDefaultOwnerError(err.message || 'Kunne ikke oppdatere standardvisningen.');
     } finally {
       setIsUpdatingDefaultOwner(false);
     }
+  };
+
+  const toggleDefaultOwnerSelection = async (name) => {
+    const trimmed = name?.trim();
+    if (!trimmed) return;
+    const exists = defaultOwners.includes(trimmed);
+    const next = exists
+      ? defaultOwners.filter((owner) => owner !== trimmed)
+      : [...defaultOwners, trimmed];
+    await handleUpdateDefaultOwners(next);
   };
 
   const handleExport = async () => {
@@ -236,35 +270,39 @@ const SettingsPage = () => {
           )}
           {ownerNames.length > 0 && (
             <div className="default-owner-selector">
-              <p style={{ marginTop: '1rem' }}>Velg hvilken tag/navn som skal være standard for Faste utgifter.</p>
+              <p style={{ marginTop: '1rem' }}>
+                Velg hvilke tagger/navn som skal være standard for Faste utgifter. Du kan markere flere.
+              </p>
               <div className="owner-default-list">
-                {ownerNames.map((name) => (
-                  <div key={`${name}-default`} className="owner-default-row">
-                    <span>{name}</span>
-                    {defaultOwner === name ? (
-                      <span className="badge">Markert som standard</span>
-                    ) : (
-                      <button
-                        type="button"
-                        className="secondary"
-                        onClick={() => handleSetDefaultOwner(name)}
-                        disabled={isUpdatingDefaultOwner}
-                      >
-                        Marker som standard
-                      </button>
-                    )}
-                  </div>
-                ))}
+                {ownerNames.map((name) => {
+                  const isSelected = defaultOwners.includes(name);
+                  return (
+                    <div key={`${name}-default`} className="owner-default-row">
+                      <span>{name}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <button
+                          type="button"
+                          className="secondary"
+                          onClick={() => toggleDefaultOwnerSelection(name)}
+                          disabled={isUpdatingDefaultOwner}
+                        >
+                          {isSelected ? 'Fjern fra standard' : 'Legg til i standard'}
+                        </button>
+                        {isSelected && <span className="badge">Valgt</span>}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-              {defaultOwner && (
+              {defaultOwners.length > 0 && (
                 <button
                   type="button"
                   className="secondary"
-                  onClick={() => handleSetDefaultOwner('')}
+                  onClick={() => handleUpdateDefaultOwners([])}
                   disabled={isUpdatingDefaultOwner}
                   style={{ marginTop: '0.75rem' }}
                 >
-                  Fjern standardvalg
+                  Fjern alle standardvalg
                 </button>
               )}
               {defaultOwnerStatus && (

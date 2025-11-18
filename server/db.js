@@ -10,7 +10,8 @@ const dataPath = path.join(dataDir, 'store.json');
 const DEFAULT_SETTINGS = {
   monthlyNetIncome: 0,
   ownerProfiles: [],
-  defaultFixedExpensesOwner: ''
+  defaultFixedExpensesOwner: '',
+  defaultFixedExpensesOwners: []
 };
 
 const defaultData = {
@@ -64,9 +65,21 @@ class Store {
     } else {
       this.state.settings.monthlyNetIncome = Number(this.state.settings.monthlyNetIncome) || 0;
       this.state.settings.ownerProfiles = this.normalizeOwnerProfiles(this.state.settings.ownerProfiles || []);
-      if (typeof this.state.settings.defaultFixedExpensesOwner !== 'string') {
-        this.state.settings.defaultFixedExpensesOwner = '';
+      if (!Array.isArray(this.state.settings.defaultFixedExpensesOwners)) {
+        this.state.settings.defaultFixedExpensesOwners = [];
       }
+      this.state.settings.defaultFixedExpensesOwners = this.normalizeDefaultOwnerList(
+        this.state.settings.defaultFixedExpensesOwners
+      );
+      const legacyDefault =
+        typeof this.state.settings.defaultFixedExpensesOwner === 'string'
+          ? this.state.settings.defaultFixedExpensesOwner.trim()
+          : '';
+      if (legacyDefault && !this.state.settings.defaultFixedExpensesOwners.length) {
+        this.state.settings.defaultFixedExpensesOwners = [legacyDefault];
+      }
+      this.state.settings.defaultFixedExpensesOwner =
+        this.state.settings.defaultFixedExpensesOwners[0] || '';
     }
 
     if (!Array.isArray(this.state.fixedExpenses)) {
@@ -135,6 +148,19 @@ class Store {
       map.set(name, income);
     });
     return Array.from(map.entries()).map(([name, monthlyNetIncome]) => ({ name, monthlyNetIncome }));
+  }
+
+  normalizeDefaultOwnerList(value) {
+    const values = Array.isArray(value) ? value : [];
+    const seen = new Set();
+    values.forEach((item) => {
+      if (typeof item !== 'string') return;
+      const trimmed = item.trim();
+      if (trimmed) {
+        seen.add(trimmed);
+      }
+    });
+    return Array.from(seen);
   }
 
   nextId(key) {
@@ -408,9 +434,25 @@ class Store {
     if (!Array.isArray(this.state.settings.ownerProfiles)) {
       this.state.settings.ownerProfiles = [];
     }
+    if (!Array.isArray(this.state.settings.defaultFixedExpensesOwners)) {
+      this.state.settings.defaultFixedExpensesOwners = [];
+    }
+    this.state.settings.defaultFixedExpensesOwners = this.normalizeDefaultOwnerList(
+      this.state.settings.defaultFixedExpensesOwners
+    );
     if (typeof this.state.settings.defaultFixedExpensesOwner !== 'string') {
       this.state.settings.defaultFixedExpensesOwner = '';
     }
+    if (
+      !this.state.settings.defaultFixedExpensesOwners.length &&
+      this.state.settings.defaultFixedExpensesOwner.trim()
+    ) {
+      this.state.settings.defaultFixedExpensesOwners = [
+        this.state.settings.defaultFixedExpensesOwner.trim()
+      ];
+    }
+    this.state.settings.defaultFixedExpensesOwner =
+      this.state.settings.defaultFixedExpensesOwners[0] || '';
     return this.state.settings;
   }
 
@@ -428,15 +470,23 @@ class Store {
       next.ownerProfiles = [];
     }
 
-    if (payload.defaultFixedExpensesOwner !== undefined) {
-      if (payload.defaultFixedExpensesOwner === null) {
-        next.defaultFixedExpensesOwner = '';
-      } else if (typeof payload.defaultFixedExpensesOwner === 'string') {
-        next.defaultFixedExpensesOwner = payload.defaultFixedExpensesOwner.trim();
-      }
-    } else if (typeof next.defaultFixedExpensesOwner !== 'string') {
-      next.defaultFixedExpensesOwner = '';
+    if (payload.defaultFixedExpensesOwners !== undefined) {
+      next.defaultFixedExpensesOwners = this.normalizeDefaultOwnerList(
+        payload.defaultFixedExpensesOwners
+      );
+    } else if (!Array.isArray(next.defaultFixedExpensesOwners)) {
+      next.defaultFixedExpensesOwners = [];
     }
+
+    if (payload.defaultFixedExpensesOwner !== undefined && payload.defaultFixedExpensesOwners === undefined) {
+      if (payload.defaultFixedExpensesOwner === null || payload.defaultFixedExpensesOwner === '') {
+        next.defaultFixedExpensesOwners = [];
+      } else if (typeof payload.defaultFixedExpensesOwner === 'string') {
+        next.defaultFixedExpensesOwners = [payload.defaultFixedExpensesOwner.trim()].filter(Boolean);
+      }
+    }
+
+    next.defaultFixedExpensesOwner = next.defaultFixedExpensesOwners[0] || '';
 
     this.state.settings = next;
     this.save();
@@ -479,13 +529,17 @@ class Store {
     );
 
     const settingsPayload = data.settings || {};
+    const defaultOwnersFromPayload = Array.isArray(settingsPayload.defaultFixedExpensesOwners)
+      ? this.normalizeDefaultOwnerList(settingsPayload.defaultFixedExpensesOwners)
+      : typeof settingsPayload.defaultFixedExpensesOwner === 'string'
+      ? this.normalizeDefaultOwnerList([settingsPayload.defaultFixedExpensesOwner])
+      : [];
+
     const settings = {
       monthlyNetIncome: Number(settingsPayload.monthlyNetIncome) || 0,
       ownerProfiles: this.normalizeOwnerProfiles(settingsPayload.ownerProfiles || settingsPayload.ownerprofiles),
-      defaultFixedExpensesOwner:
-        typeof settingsPayload.defaultFixedExpensesOwner === 'string'
-          ? settingsPayload.defaultFixedExpensesOwner.trim()
-          : ''
+      defaultFixedExpensesOwner: defaultOwnersFromPayload[0] || '',
+      defaultFixedExpensesOwners: defaultOwnersFromPayload
     };
 
     const counters = data.counters || {
