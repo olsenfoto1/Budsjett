@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 import { Doughnut } from 'react-chartjs-2';
 import { api } from '../api.js';
@@ -21,16 +22,50 @@ const createEmptyForm = (category = FALLBACK_CATEGORY_OPTIONS[0]) => ({
   note: ''
 });
 
-const Modal = ({ children, onClose }) => (
-  <div className="modal-overlay" role="dialog" aria-modal="true">
-    <div className="modal-card">
-      <button type="button" className="secondary close-button" onClick={onClose}>
-        Lukk
-      </button>
-      {children}
-    </div>
-  </div>
-);
+const Modal = ({ children, onClose }) => {
+  const elRef = useRef(null);
+  if (typeof document !== 'undefined' && !elRef.current) {
+    elRef.current = document.createElement('div');
+  }
+
+  useEffect(() => {
+    if (!elRef.current) return undefined;
+    const modalRoot = elRef.current;
+    document.body.appendChild(modalRoot);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+      if (modalRoot.parentNode) {
+        modalRoot.parentNode.removeChild(modalRoot);
+      }
+    };
+  }, [onClose]);
+
+  if (!elRef.current) return null;
+
+  return createPortal(
+    <div className="modal-overlay" role="dialog" aria-modal="true" onClick={onClose}>
+      <div className="modal-card" onClick={(event) => event.stopPropagation()}>
+        <button type="button" className="secondary close-button" onClick={onClose}>
+          Lukk
+        </button>
+        {children}
+      </div>
+    </div>,
+    elRef.current
+  );
+};
 
 const FixedExpensesPage = () => {
   const [expenses, setExpenses] = useState([]);
