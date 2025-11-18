@@ -87,7 +87,6 @@ const FixedExpensesPage = () => {
   const [categoryOptions, setCategoryOptions] = useState(FALLBACK_CATEGORY_OPTIONS);
   const [categoryColorMap, setCategoryColorMap] = useState(() => ({ ...FALLBACK_CATEGORY_COLORS }));
   const [categoryError, setCategoryError] = useState('');
-  const [hiddenCategories, setHiddenCategories] = useState([]);
   const [isLoadingCategories, setIsLoadingCategories] = useState(false);
   const [bulkOwnersInput, setBulkOwnersInput] = useState('');
   const [bulkOwnersError, setBulkOwnersError] = useState('');
@@ -207,6 +206,11 @@ const FixedExpensesPage = () => {
     );
   }, [expenses, activeOwners]);
 
+  const totalPerMonth = useMemo(
+    () => filteredExpenses.reduce((sum, expense) => sum + (Number(expense.amountPerMonth) || 0), 0),
+    [filteredExpenses]
+  );
+
   const categoryTotals = useMemo(() => {
     const map = new Map();
     filteredExpenses.forEach((expense) => {
@@ -221,23 +225,6 @@ const FixedExpensesPage = () => {
       }))
       .sort((a, b) => b.total - a.total);
   }, [filteredExpenses, categoryColorMap]);
-
-  const hiddenCategorySet = useMemo(() => new Set(hiddenCategories), [hiddenCategories]);
-
-  const visibleCategoryTotals = useMemo(
-    () => categoryTotals.filter((item) => !hiddenCategorySet.has(item.category)),
-    [categoryTotals, hiddenCategorySet]
-  );
-
-  const fullTotalPerMonth = useMemo(
-    () => filteredExpenses.reduce((sum, expense) => sum + (Number(expense.amountPerMonth) || 0), 0),
-    [filteredExpenses]
-  );
-
-  const totalPerMonth = useMemo(
-    () => visibleCategoryTotals.reduce((sum, item) => sum + (Number(item.total) || 0), 0),
-    [visibleCategoryTotals]
-  );
 
   const levelTotals = useMemo(() => {
     const map = new Map();
@@ -279,42 +266,6 @@ const FixedExpensesPage = () => {
       .sort((a, b) => new Date(a.bindingEndDate) - new Date(b.bindingEndDate));
   }, [filteredExpenses]);
 
-  useEffect(() => {
-    setHiddenCategories((current) => current.filter((category) => categoryTotals.some((item) => item.category === category)));
-  }, [categoryTotals]);
-
-  const handleLegendClick = useCallback(
-    (event, legendItem, legend) => {
-      const index = legendItem.index;
-      const label = legend?.chart?.data?.labels?.[index];
-      if (!label) {
-        return;
-      }
-      setHiddenCategories((current) => {
-        if (current.includes(label)) {
-          return current.filter((item) => item !== label);
-        }
-        return [...current, label];
-      });
-      legend?.chart?.toggleDataVisibility(index);
-      legend?.chart?.update();
-    },
-    []
-  );
-
-  const doughnutOptions = useMemo(
-    () => ({
-      plugins: {
-        legend: {
-          position: 'bottom',
-          onClick: handleLegendClick
-        }
-      },
-      cutout: '65%'
-    }),
-    [handleLegendClick]
-  );
-
   const doughnutData = useMemo(() => {
     if (!categoryTotals.length) {
       return null;
@@ -342,11 +293,16 @@ const FixedExpensesPage = () => {
     return map;
   }, [ownerProfiles]);
 
+  const availabilityTotalPerMonth = useMemo(
+    () => filteredExpenses.reduce((sum, expense) => sum + (Number(expense.amountPerMonth) || 0), 0),
+    [filteredExpenses]
+  );
+
   const activeIncome = activeOwners.length
     ? activeOwners.reduce((sum, owner) => sum + (ownerIncomeMap.get(owner) || 0), 0)
     : monthlyNetIncome;
   const hasIncomeValue = typeof activeIncome === 'number' && Number.isFinite(activeIncome);
-  const freeAfterFixed = hasIncomeValue ? activeIncome - totalPerMonth : null;
+  const freeAfterFixed = hasIncomeValue ? activeIncome - availabilityTotalPerMonth : null;
   const netIncomeLoaded = settingsLoaded;
   const luxuryTotal = levelTotals.find((item) => item.level === 'Luksus')?.total || 0;
   const missingIncomeOwners =
@@ -480,18 +436,15 @@ const FixedExpensesPage = () => {
 
   const simulation = useMemo(() => {
     if (!simulatedExpense) return null;
-    const categoryKey = simulatedExpense.category || 'Annet';
-    const baselineIncludesExpense = !hiddenCategories.includes(categoryKey);
-    const baselineTotal = baselineIncludesExpense ? totalPerMonth : fullTotalPerMonth;
+    const newTotal = totalPerMonth - (simulatedExpense.amountPerMonth || 0);
     const savedMonthly = simulatedExpense.amountPerMonth || 0;
-    const newTotal = baselineTotal - savedMonthly;
     return {
-      current: baselineTotal,
+      current: totalPerMonth,
       newTotal,
       savedMonthly,
       savedYearly: savedMonthly * 12
     };
-  }, [simulatedExpense, totalPerMonth, fullTotalPerMonth, hiddenCategories]);
+  }, [simulatedExpense, totalPerMonth]);
 
 
 
@@ -549,12 +502,6 @@ const FixedExpensesPage = () => {
           <p className="muted">
             {filteredExpenses.length} aktive avtaler
             {manualFilterActive && ` (av ${expenses.length})`}
-            {hiddenCategories.length > 0 && (
-              <>
-                <br />
-                Ekskluderer {hiddenCategories.join(', ')} via kategori-filteret.
-              </>
-            )}
           </p>
         </div>
         <div className="card insight-card glow-mint">
@@ -568,7 +515,6 @@ const FixedExpensesPage = () => {
               <p className="muted">
                 Basert på {incomeSourceDescription} og {filterDescription}.
                 {showingDefaultOwnerIncome && ' (Standardvalg fra innstillinger.)'}
-                {hiddenCategories.length > 0 && ' Viser kun valgte kategorier fra grafen.'}
               </p>
             </>
           )}
@@ -583,10 +529,7 @@ const FixedExpensesPage = () => {
           <h3>Sum per kategori</h3>
           <div className="pill-list">
             {categoryTotals.length === 0 && <p className="muted">Ingen registrerte utgifter ennå.</p>}
-            {categoryTotals.length > 0 && visibleCategoryTotals.length === 0 && (
-              <p className="muted">Ingen kategorier er valgt i grafen akkurat nå.</p>
-            )}
-            {visibleCategoryTotals.map((item) => (
+            {categoryTotals.map((item) => (
               <div key={item.category} className="pill-row">
                 <span>{item.category}</span>
                 <strong>{formatCurrency(item.total)}</strong>
@@ -616,19 +559,16 @@ const FixedExpensesPage = () => {
       <div className="card insight-card glow-ocean chart-card">
         <div className="section-header" style={{ marginTop: 0 }}>
           <h2>Fordeling per kategori</h2>
-          {doughnutData && (
-            <span className="badge">
-              {visibleCategoryTotals.length === categoryTotals.length
-                ? `${categoryTotals.length} kategorier`
-                : `${visibleCategoryTotals.length}/${categoryTotals.length} kategorier`}
-            </span>
-          )}
+          {doughnutData && <span className="badge">{categoryTotals.length} kategorier</span>}
         </div>
         {doughnutData ? (
           <div className="chart-wrapper">
             <Doughnut
               data={doughnutData}
-              options={doughnutOptions}
+              options={{
+                plugins: { legend: { position: 'bottom' } },
+                cutout: '65%'
+              }}
             />
           </div>
         ) : (
