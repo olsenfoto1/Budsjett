@@ -66,6 +66,8 @@ const DashboardPage = () => {
         }
       : null;
 
+  const baselineFixedCosts =
+    summary.effectiveFixedExpenseTotal ?? summary.fixedExpenseTotal ?? summary.fixedExpensesTotal ?? 0;
   const monthlyForecast = Array.from({ length: 12 }, (_, index) => {
     const date = new Date();
     date.setMonth(date.getMonth() + index);
@@ -73,7 +75,7 @@ const DashboardPage = () => {
       month: 'short',
       year: 'numeric'
     });
-    const fixedCosts = summary.fixedExpenseTotal || 0;
+    const fixedCosts = baselineFixedCosts;
     const availableAfterFixed = summary.freeAfterFixed || 0;
     return {
       label,

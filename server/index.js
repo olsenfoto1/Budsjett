@@ -342,6 +342,27 @@ app.get('/api/dashboard', (req, res) => {
 
   const fixedExpenseTotal = fixedExpenses.reduce((sum, expense) => sum + (expense.amountPerMonth || 0), 0);
 
+  const ownerIncomeMap = (settings.ownerProfiles || []).reduce((map, profile) => {
+    if (profile?.name) {
+      const income = Number(profile.monthlyNetIncome);
+      if (Number.isFinite(income)) {
+        map.set(profile.name, income);
+      }
+    }
+    return map;
+  }, new Map());
+  const defaultOwner =
+    typeof settings.defaultFixedExpensesOwner === 'string'
+      ? settings.defaultFixedExpensesOwner.trim()
+      : '';
+  const filteredFixedExpenses = defaultOwner
+    ? fixedExpenses.filter((expense) => (expense.owners || []).includes(defaultOwner))
+    : fixedExpenses;
+  const effectiveFixedExpenseTotal = filteredFixedExpenses.reduce(
+    (sum, expense) => sum + (expense.amountPerMonth || 0),
+    0
+  );
+
   const categoryColorMap = categories.reduce((map, category) => {
     map[category.name] = category.color;
     return map;
@@ -391,7 +412,10 @@ app.get('/api/dashboard', (req, res) => {
     .sort((a, b) => new Date(a.bindingEndDate) - new Date(b.bindingEndDate));
 
   const monthlyNetIncome = Number(settings.monthlyNetIncome) || 0;
-  const freeAfterFixed = monthlyNetIncome - fixedExpenseTotal;
+  const ownerIncome = ownerIncomeMap.get(defaultOwner);
+  const hasOwnerIncome = typeof ownerIncome === 'number' && Number.isFinite(ownerIncome);
+  const activeMonthlyNetIncome = defaultOwner && hasOwnerIncome ? ownerIncome : monthlyNetIncome;
+  const freeAfterFixed = activeMonthlyNetIncome - effectiveFixedExpenseTotal;
 
   const categoryTotals = categories.map((category) => ({
     ...category,
@@ -448,7 +472,9 @@ app.get('/api/dashboard', (req, res) => {
     fixedExpenseCategoryTotals,
     fixedExpenseLevelTotals,
     monthlyNetIncome,
+    activeMonthlyNetIncome,
     freeAfterFixed,
+    effectiveFixedExpenseTotal,
     bindingExpirations,
     fixedExpensesCount: fixedExpenses.length
   });
