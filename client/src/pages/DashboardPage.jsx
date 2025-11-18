@@ -10,15 +10,12 @@ ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, PointE
 const DashboardPage = () => {
   const [summary, setSummary] = useState(null);
   const [error, setError] = useState('');
-  const [incomeInput, setIncomeInput] = useState('');
-  const [statusMessage, setStatusMessage] = useState('');
   const [savingsStats, setSavingsStats] = useState(() => summarizeSavingsGoals(loadSavingsGoals()));
 
   const fetchSummary = async () => {
     try {
       const data = await api.getSummary();
       setSummary(data);
-      setIncomeInput(String(Math.round(data.monthlyNetIncome || 0)) || '');
     } catch (err) {
       setError(err.message);
     }
@@ -42,18 +39,6 @@ const DashboardPage = () => {
       }
     };
   }, []);
-
-  const handleIncomeSubmit = async (event) => {
-    event.preventDefault();
-    try {
-      await api.updateSettings({ monthlyNetIncome: Number(incomeInput) || 0 });
-      setStatusMessage('Lagret!');
-      fetchSummary();
-      setTimeout(() => setStatusMessage(''), 2000);
-    } catch (err) {
-      setStatusMessage(err.message);
-    }
-  };
 
   if (error) {
     return <p>Kunne ikke laste data: {error}</p>;
@@ -133,26 +118,6 @@ const DashboardPage = () => {
           <h3>Faste kostnader per måned</h3>
           <p className="stat">{formatCurrency(summary.fixedExpenseTotal)}</p>
           <p className="muted">{summary.fixedExpensesCount} aktive avtaler</p>
-        </div>
-        <div className="card">
-          <div className="panel-header">
-            <div>
-              <h3>Netto inntekt per måned</h3>
-              <p className="muted">Brukes som utgangspunkt for oversikten.</p>
-            </div>
-            {statusMessage && <span className="badge">{statusMessage}</span>}
-          </div>
-          <form className="inline-form" onSubmit={handleIncomeSubmit}>
-            <label htmlFor="monthlyNetIncome">Beløp (NOK)</label>
-            <input
-              id="monthlyNetIncome"
-              type="number"
-              min="0"
-              value={incomeInput}
-              onChange={(e) => setIncomeInput(e.target.value)}
-            />
-            <button type="submit">Oppdater</button>
-          </form>
         </div>
         <div className="card">
           <h3>Tilgjengelig etter faste kostnader</h3>

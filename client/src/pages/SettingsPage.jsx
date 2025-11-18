@@ -165,21 +165,8 @@ const SettingsPage = () => {
     }
   };
 
-  const handleDeleteLegacyData = async () => {
-    if (typeof window !== 'undefined') {
-      const confirmed = window.confirm('Slette alle gamle transaksjoner? Dette kan ikke angres.');
-      if (!confirmed) return;
-    }
-    try {
-      const { deleted = 0 } = await api.deleteAllTransactions();
-      setStatus(`Slettet ${deleted} gamle transaksjoner.`);
-    } catch (err) {
-      setStatus('Kunne ikke slette data: ' + err.message);
-    }
-  };
-
   return (
-    <div>
+    <div className="settings-page">
       <div className="section-header">
         <h2>Innstillinger</h2>
       </div>
@@ -200,7 +187,7 @@ const SettingsPage = () => {
           <button onClick={handleImport}>Importer</button>
         </div>
 
-        <div className="card">
+        <div className="card owner-income-card">
           <h3>Personer og netto inntekt</h3>
           <p>Navn fra faste utgifter dukker opp automatisk. Legg inn beløp per måned per person.</p>
           {ownersLoading && <p className="muted">Laster personer…</p>}
@@ -248,17 +235,9 @@ const SettingsPage = () => {
           )}
           {ownerError && <p className="error-text">{ownerError}</p>}
         </div>
-
-        <div className="card">
-          <h3>Rydd opp gamle transaksjoner</h3>
-          <p>Fjern eldre transaksjoner og tilhørende summer for en ren start.</p>
-          <button className="danger" onClick={handleDeleteLegacyData}>
-            Slett gammel data
-          </button>
-        </div>
       </div>
 
-      {status && <p style={{ marginTop: '1rem', color: '#2563eb' }}>{status}</p>}
+      {status && <p className="settings-status">{status}</p>}
     </div>
   );
 };

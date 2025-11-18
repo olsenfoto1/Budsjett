@@ -23,7 +23,6 @@ export const api = {
   updateTransaction: (id, payload) =>
     request(`/transactions/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
   deleteTransaction: (id) => request(`/transactions/${id}`, { method: 'DELETE' }),
-  deleteAllTransactions: () => request('/transactions', { method: 'DELETE' }),
 
   getFixedExpenses: () => request('/faste-utgifter'),
   createFixedExpense: (payload) => request('/faste-utgifter', { method: 'POST', body: JSON.stringify(payload) }),
