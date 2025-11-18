@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, PointElement, LineElement, BarElement } from 'chart.js';
 import { Line, Doughnut, Bar } from 'react-chartjs-2';
 import { api } from '../api.js';
@@ -11,8 +11,6 @@ const DashboardPage = () => {
   const [summary, setSummary] = useState(null);
   const [error, setError] = useState('');
   const [savingsStats, setSavingsStats] = useState(() => summarizeSavingsGoals(loadSavingsGoals()));
-  const [hiddenCategories, setHiddenCategories] = useState([]);
-  const doughnutRef = useRef(null);
 
   const fetchSummary = async () => {
     try {
@@ -54,76 +52,6 @@ const DashboardPage = () => {
   const fixedLevels = summary.fixedExpenseLevelTotals || [];
   const bindingSoon = summary.bindingExpirations || [];
 
-  useEffect(() => {
-    setHiddenCategories((current) =>
-      current.filter((category) => fixedCategories.some((item) => item.category === category))
-    );
-  }, [fixedCategories]);
-
-  const hiddenCategorySet = useMemo(() => new Set(hiddenCategories), [hiddenCategories]);
-
-  const visibleCategoryTotals = useMemo(
-    () => fixedCategories.filter((item) => !hiddenCategorySet.has(item.category)),
-    [fixedCategories, hiddenCategorySet]
-  );
-
-  const defaultFixedTotal =
-    summary.effectiveFixedExpenseTotal ?? summary.fixedExpenseTotal ?? summary.fixedExpensesTotal ?? 0;
-
-  const visibleFixedTotal = useMemo(() => {
-    if (fixedCategories.length === 0) {
-      return defaultFixedTotal;
-    }
-    return visibleCategoryTotals.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
-  }, [visibleCategoryTotals, fixedCategories.length, defaultFixedTotal]);
-
-  const activeMonthlyNetIncome =
-    typeof summary.activeMonthlyNetIncome === 'number'
-      ? summary.activeMonthlyNetIncome
-      : typeof summary.monthlyNetIncome === 'number'
-      ? summary.monthlyNetIncome
-      : null;
-
-  const visibleFreeAfterFixed = useMemo(() => {
-    if (fixedCategories.length === 0) {
-      return summary.freeAfterFixed ?? 0;
-    }
-    if (typeof activeMonthlyNetIncome === 'number') {
-      return activeMonthlyNetIncome - visibleFixedTotal;
-    }
-    return summary.freeAfterFixed ?? 0;
-  }, [activeMonthlyNetIncome, fixedCategories.length, summary.freeAfterFixed, visibleFixedTotal]);
-
-  const handleLegendClick = useCallback((event, legendItem, legend) => {
-    const label = legend?.chart?.data?.labels?.[legendItem.index];
-    if (!label) {
-      return;
-    }
-    setHiddenCategories((current) =>
-      current.includes(label) ? current.filter((item) => item !== label) : [...current, label]
-    );
-    legend?.chart?.toggleDataVisibility(legendItem.index);
-    legend?.chart?.update();
-  }, []);
-
-  useEffect(() => {
-    const chart = doughnutRef.current;
-    if (!chart) return;
-    const labels = chart.data?.labels || [];
-    let needsUpdate = false;
-    labels.forEach((label, index) => {
-      const shouldHide = hiddenCategorySet.has(label);
-      const isVisible = chart.getDataVisibility(index);
-      if (shouldHide === isVisible) {
-        chart.toggleDataVisibility(index);
-        needsUpdate = true;
-      }
-    });
-    if (needsUpdate) {
-      chart.update();
-    }
-  }, [hiddenCategorySet, fixedCategories]);
-
   const doughnutData =
     fixedCategories.length > 0
       ? {
@@ -138,43 +66,23 @@ const DashboardPage = () => {
         }
       : null;
 
-  const doughnutOptions = useMemo(
-    () => ({
-      plugins: {
-        legend: {
-          position: 'bottom',
-          onClick: handleLegendClick
-        }
-      },
-      cutout: '60%'
-    }),
-    [handleLegendClick]
-  );
-
-  const categoryBadgeText =
-    fixedCategories.length > 0
-      ? hiddenCategories.length > 0
-        ? `${visibleCategoryTotals.length}/${fixedCategories.length} kategorier`
-        : `${fixedCategories.length} kategorier`
-      : '';
-
-  const monthlyForecast = useMemo(
-    () =>
-      Array.from({ length: 12 }, (_, index) => {
-        const date = new Date();
-        date.setMonth(date.getMonth() + index);
-        const label = date.toLocaleDateString('no-NO', {
-          month: 'short',
-          year: 'numeric'
-        });
-        return {
-          label,
-          fixedCosts: visibleFixedTotal,
-          availableAfterFixed: visibleFreeAfterFixed
-        };
-      }),
-    [visibleFixedTotal, visibleFreeAfterFixed]
-  );
+  const baselineFixedCosts =
+    summary.effectiveFixedExpenseTotal ?? summary.fixedExpenseTotal ?? summary.fixedExpensesTotal ?? 0;
+  const monthlyForecast = Array.from({ length: 12 }, (_, index) => {
+    const date = new Date();
+    date.setMonth(date.getMonth() + index);
+    const label = date.toLocaleDateString('no-NO', {
+      month: 'short',
+      year: 'numeric'
+    });
+    const fixedCosts = baselineFixedCosts;
+    const availableAfterFixed = summary.freeAfterFixed || 0;
+    return {
+      label,
+      fixedCosts,
+      availableAfterFixed
+    };
+  });
 
   const lineData = {
     labels: monthlyForecast.map((item) => item.label),
@@ -210,21 +118,15 @@ const DashboardPage = () => {
       <div className="card-grid">
         <div className="card">
           <h3>Faste kostnader per måned</h3>
-          <p className="stat">{formatCurrency(visibleFixedTotal)}</p>
-          <p className="muted">
-            {summary.fixedExpensesCount} aktive avtaler
-            {hiddenCategories.length > 0 && ' · Viser kun valgte kategorier fra grafen.'}
-          </p>
+          <p className="stat">{formatCurrency(summary.fixedExpenseTotal)}</p>
+          <p className="muted">{summary.fixedExpensesCount} aktive avtaler</p>
         </div>
         <div className="card">
           <h3>Tilgjengelig etter faste kostnader</h3>
-          <p className="stat" style={{ color: visibleFreeAfterFixed >= 0 ? '#16a34a' : '#dc2626' }}>
-            {formatCurrency(visibleFreeAfterFixed)}
+          <p className="stat" style={{ color: summary.freeAfterFixed >= 0 ? '#16a34a' : '#dc2626' }}>
+            {formatCurrency(summary.freeAfterFixed)}
           </p>
-          <p className="muted">
-            Basert på netto inntekt
-            {hiddenCategories.length > 0 && ' · Tar hensyn til valgte kategorier fra grafen.'}
-          </p>
+          <p className="muted">Basert på netto inntekt</p>
         </div>
         <div className="card">
           <h3>Sparemål</h3>
@@ -246,12 +148,12 @@ const DashboardPage = () => {
 
       <div className="section-header">
         <h2>Fordeling av faste kostnader</h2>
-        {doughnutData && <span className="badge">{categoryBadgeText}</span>}
+        {doughnutData && <span className="badge">{fixedCategories.length} kategorier</span>}
       </div>
       <div className="card">
         {doughnutData ? (
           <div className="chart-wrapper">
-            <Doughnut ref={doughnutRef} data={doughnutData} options={doughnutOptions} />
+            <Doughnut data={doughnutData} options={{ plugins: { legend: { position: 'bottom' } }, cutout: '60%' }} />
           </div>
         ) : (
           <p className="muted">Registrer faste utgifter for å se fordelingen.</p>
