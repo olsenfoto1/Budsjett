@@ -8,6 +8,13 @@ import { formatCurrency, formatDate, formatNotice } from '../utils/format.js';
 ChartJS.register(ArcElement, Tooltip, Legend);
 
 const FALLBACK_CATEGORY_OPTIONS = ['Abonnementer', 'Lån', 'Forsikring', 'Strøm', 'Annet'];
+const FALLBACK_CATEGORY_COLORS = {
+  Abonnementer: '#6366f1',
+  Lån: '#f97316',
+  Forsikring: '#14b8a6',
+  Strøm: '#facc15',
+  Annet: '#94a3b8'
+};
 const LEVEL_OPTIONS = ['Må-ha', 'Kjekt å ha', 'Luksus'];
 
 const createEmptyForm = (category = FALLBACK_CATEGORY_OPTIONS[0]) => ({
@@ -77,6 +84,7 @@ const FixedExpensesPage = () => {
   const handleCloseSimulation = useCallback(() => setSimulatedExpense(null), []);
   const [selectedOwner, setSelectedOwner] = useState(null);
   const [categoryOptions, setCategoryOptions] = useState(FALLBACK_CATEGORY_OPTIONS);
+  const [categoryColorMap, setCategoryColorMap] = useState(() => ({ ...FALLBACK_CATEGORY_COLORS }));
   const [categoryError, setCategoryError] = useState('');
   const [isLoadingCategories, setIsLoadingCategories] = useState(false);
   const [bulkOwnersInput, setBulkOwnersInput] = useState('');
@@ -138,10 +146,18 @@ const FixedExpensesPage = () => {
       } else {
         setCategoryOptions(FALLBACK_CATEGORY_OPTIONS);
       }
+      const colors = { ...FALLBACK_CATEGORY_COLORS };
+      categories.forEach((category) => {
+        if (category?.name) {
+          colors[category.name] = category.color || colors[category.name] || '#94a3b8';
+        }
+      });
+      setCategoryColorMap(colors);
     } catch (err) {
       console.error('Kunne ikke hente kategorier', err);
       setCategoryError('Kunne ikke hente oppdaterte kategorier. Viser standardvalg.');
       setCategoryOptions((current) => (current.length ? current : FALLBACK_CATEGORY_OPTIONS));
+      setCategoryColorMap((current) => (Object.keys(current).length ? current : { ...FALLBACK_CATEGORY_COLORS }));
     } finally {
       setIsLoadingCategories(false);
     }
@@ -168,9 +184,13 @@ const FixedExpensesPage = () => {
       map.set(key, (map.get(key) || 0) + (expense.amountPerMonth || 0));
     });
     return Array.from(map.entries())
-      .map(([category, total]) => ({ category, total }))
+      .map(([category, total]) => ({
+        category,
+        total,
+        color: categoryColorMap[category] || FALLBACK_CATEGORY_COLORS[category] || '#94a3b8'
+      }))
       .sort((a, b) => b.total - a.total);
-  }, [filteredExpenses]);
+  }, [filteredExpenses, categoryColorMap]);
 
   const levelTotals = useMemo(() => {
     const map = new Map();
@@ -221,7 +241,7 @@ const FixedExpensesPage = () => {
       datasets: [
         {
           data: categoryTotals.map((item) => item.total),
-          backgroundColor: ['#6366f1', '#f97316', '#14b8a6', '#facc15', '#94a3b8']
+          backgroundColor: categoryTotals.map((item) => item.color || '#94a3b8')
         }
       ]
     };

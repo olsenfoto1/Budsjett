@@ -304,6 +304,11 @@ app.get('/api/dashboard', (req, res) => {
 
   const fixedExpenseTotal = fixedExpenses.reduce((sum, expense) => sum + (expense.amountPerMonth || 0), 0);
 
+  const categoryColorMap = categories.reduce((map, category) => {
+    map[category.name] = category.color;
+    return map;
+  }, {});
+
   const fixedCategoryTotalsMap = {};
   fixedExpenses.forEach((expense) => {
     const key = expense.category || 'Annet';
@@ -311,7 +316,11 @@ app.get('/api/dashboard', (req, res) => {
     fixedCategoryTotalsMap[key] += expense.amountPerMonth || 0;
   });
   const fixedExpenseCategoryTotals = Object.entries(fixedCategoryTotalsMap)
-    .map(([category, total]) => ({ category, total }))
+    .map(([category, total]) => ({
+      category,
+      total,
+      color: categoryColorMap[category] || '#94a3b8'
+    }))
     .sort((a, b) => b.total - a.total);
 
   const fixedLevelTotalsMap = {};

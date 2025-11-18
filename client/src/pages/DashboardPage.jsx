@@ -75,7 +75,7 @@ const DashboardPage = () => {
             {
               label: 'Faste kostnader',
               data: fixedCategories.map((item) => item.total),
-              backgroundColor: ['#6366f1', '#f97316', '#14b8a6', '#facc15', '#94a3b8']
+              backgroundColor: fixedCategories.map((item) => item.color || '#94a3b8')
             }
           ]
         }
