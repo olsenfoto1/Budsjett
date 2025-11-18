@@ -218,17 +218,20 @@ main {
   gap: 0.85rem;
 }
 
-.fixed-expenses-page {
+.fixed-expenses-page,
+.dashboard-page {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
 }
 
-.fixed-expenses-page .section-header:first-of-type {
+.fixed-expenses-page .section-header:first-of-type,
+.dashboard-page .section-header:first-of-type {
   margin-bottom: 1.25rem;
 }
 
-.fixed-expenses-page .insight-card {
+.fixed-expenses-page .insight-card,
+.dashboard-page .insight-card {
   position: relative;
   overflow: hidden;
   isolation: isolate;
@@ -239,7 +242,9 @@ main {
 }
 
 .fixed-expenses-page .insight-card::before,
-.fixed-expenses-page .insight-card::after {
+.fixed-expenses-page .insight-card::after,
+.dashboard-page .insight-card::before,
+.dashboard-page .insight-card::after {
   content: '';
   position: absolute;
   inset: 0;
@@ -248,91 +253,109 @@ main {
   transition: opacity 0.3s ease;
 }
 
-.fixed-expenses-page .insight-card::before {
+.fixed-expenses-page .insight-card::before,
+.dashboard-page .insight-card::before {
   background: var(--tile-gradient, transparent);
   opacity: 0.75;
 }
 
-.fixed-expenses-page .insight-card::after {
+.fixed-expenses-page .insight-card::after,
+.dashboard-page .insight-card::after {
   background: radial-gradient(circle at 15% 20%, var(--glow-color, rgba(37, 99, 235, 0.3)), transparent 60%);
   opacity: 0.9;
 }
 
-.fixed-expenses-page .insight-card:hover {
+.fixed-expenses-page .insight-card:hover,
+.dashboard-page .insight-card:hover {
   transform: translateY(-6px);
   box-shadow: 0 35px 80px rgba(15, 23, 42, 0.18);
 }
 
-.fixed-expenses-page .glow-lilac {
+.fixed-expenses-page .glow-lilac,
+.dashboard-page .glow-lilac {
   --tile-gradient: linear-gradient(135deg, rgba(129, 140, 248, 0.22), rgba(59, 130, 246, 0.12));
   --glow-color: rgba(129, 140, 248, 0.45);
 }
 
-.fixed-expenses-page .glow-mint {
+.fixed-expenses-page .glow-mint,
+.dashboard-page .glow-mint {
   --tile-gradient: linear-gradient(135deg, rgba(16, 185, 129, 0.18), rgba(45, 212, 191, 0.12));
   --glow-color: rgba(45, 212, 191, 0.45);
 }
 
-.fixed-expenses-page .glow-amber {
+.fixed-expenses-page .glow-amber,
+.dashboard-page .glow-amber {
   --tile-gradient: linear-gradient(135deg, rgba(251, 191, 36, 0.28), rgba(248, 113, 113, 0.12));
   --glow-color: rgba(251, 146, 60, 0.45);
 }
 
-.fixed-expenses-page .glow-rose {
+.fixed-expenses-page .glow-rose,
+.dashboard-page .glow-rose {
   --tile-gradient: linear-gradient(135deg, rgba(248, 113, 113, 0.28), rgba(244, 114, 182, 0.15));
   --glow-color: rgba(244, 114, 182, 0.5);
 }
 
-.fixed-expenses-page .glow-ocean {
+.fixed-expenses-page .glow-ocean,
+.dashboard-page .glow-ocean {
   --tile-gradient: linear-gradient(135deg, rgba(14, 165, 233, 0.22), rgba(99, 102, 241, 0.12));
   --glow-color: rgba(14, 165, 233, 0.45);
 }
 
-.fixed-expenses-page .glow-sky {
+.fixed-expenses-page .glow-sky,
+.dashboard-page .glow-sky {
   --tile-gradient: linear-gradient(135deg, rgba(191, 219, 254, 0.35), rgba(199, 210, 254, 0.2));
   --glow-color: rgba(96, 165, 250, 0.45);
 }
 
-.fixed-expenses-page .glow-sand {
+.fixed-expenses-page .glow-sand,
+.dashboard-page .glow-sand {
   --tile-gradient: linear-gradient(135deg, rgba(253, 224, 71, 0.2), rgba(248, 196, 113, 0.12));
   --glow-color: rgba(251, 191, 36, 0.45);
 }
 
-:root[data-theme='dark'] .fixed-expenses-page .insight-card {
+:root[data-theme='dark'] .fixed-expenses-page .insight-card,
+:root[data-theme='dark'] .dashboard-page .insight-card {
   border-color: rgba(185, 198, 255, 0.18);
   background: linear-gradient(135deg, rgba(9, 13, 24, 0.95), rgba(14, 20, 34, 0.82));
   box-shadow: 0 25px 55px rgba(1, 4, 13, 0.85);
 }
 
-:root[data-theme='dark'] .fixed-expenses-page .glow-lilac {
+:root[data-theme='dark'] .fixed-expenses-page .glow-lilac,
+:root[data-theme='dark'] .dashboard-page .glow-lilac {
   --tile-gradient: linear-gradient(140deg, rgba(124, 137, 247, 0.28), rgba(96, 115, 255, 0.12));
   --glow-color: rgba(119, 133, 255, 0.32);
 }
 
-:root[data-theme='dark'] .fixed-expenses-page .glow-mint {
+:root[data-theme='dark'] .fixed-expenses-page .glow-mint,
+:root[data-theme='dark'] .dashboard-page .glow-mint {
   --tile-gradient: linear-gradient(140deg, rgba(45, 212, 191, 0.26), rgba(16, 185, 129, 0.1));
   --glow-color: rgba(45, 212, 191, 0.3);
 }
 
-:root[data-theme='dark'] .fixed-expenses-page .glow-amber {
+:root[data-theme='dark'] .fixed-expenses-page .glow-amber,
+:root[data-theme='dark'] .dashboard-page .glow-amber {
   --tile-gradient: linear-gradient(140deg, rgba(251, 191, 36, 0.32), rgba(251, 146, 60, 0.12));
   --glow-color: rgba(251, 171, 80, 0.32);
 }
 
-:root[data-theme='dark'] .fixed-expenses-page .glow-rose {
+:root[data-theme='dark'] .fixed-expenses-page .glow-rose,
+:root[data-theme='dark'] .dashboard-page .glow-rose {
   --tile-gradient: linear-gradient(140deg, rgba(244, 114, 182, 0.3), rgba(248, 113, 113, 0.12));
   --glow-color: rgba(244, 139, 193, 0.32);
 }
 
-:root[data-theme='dark'] .fixed-expenses-page .insight-card::before {
+:root[data-theme='dark'] .fixed-expenses-page .insight-card::before,
+:root[data-theme='dark'] .dashboard-page .insight-card::before {
   opacity: 0.45;
 }
 
-:root[data-theme='dark'] .fixed-expenses-page .insight-card::after {
+:root[data-theme='dark'] .fixed-expenses-page .insight-card::after,
+:root[data-theme='dark'] .dashboard-page .insight-card::after {
   background: radial-gradient(circle at 15% 20%, var(--glow-color, rgba(88, 128, 255, 0.38)), transparent 58%);
 }
 
-.fixed-expenses-page .chart-card {
+.fixed-expenses-page .chart-card,
+.dashboard-page .chart-card {
   margin-top: 1.5rem;
 }
 
