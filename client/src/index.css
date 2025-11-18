@@ -291,6 +291,26 @@ main {
   box-shadow: 0 25px 55px rgba(1, 4, 13, 0.85);
 }
 
+:root[data-theme='dark'] .fixed-expenses-page .glow-lilac {
+  --tile-gradient: linear-gradient(140deg, rgba(124, 137, 247, 0.28), rgba(96, 115, 255, 0.12));
+  --glow-color: rgba(119, 133, 255, 0.32);
+}
+
+:root[data-theme='dark'] .fixed-expenses-page .glow-mint {
+  --tile-gradient: linear-gradient(140deg, rgba(45, 212, 191, 0.26), rgba(16, 185, 129, 0.1));
+  --glow-color: rgba(45, 212, 191, 0.3);
+}
+
+:root[data-theme='dark'] .fixed-expenses-page .glow-amber {
+  --tile-gradient: linear-gradient(140deg, rgba(251, 191, 36, 0.32), rgba(251, 146, 60, 0.12));
+  --glow-color: rgba(251, 171, 80, 0.32);
+}
+
+:root[data-theme='dark'] .fixed-expenses-page .glow-rose {
+  --tile-gradient: linear-gradient(140deg, rgba(244, 114, 182, 0.3), rgba(248, 113, 113, 0.12));
+  --glow-color: rgba(244, 139, 193, 0.32);
+}
+
 :root[data-theme='dark'] .fixed-expenses-page .insight-card::before {
   opacity: 0.45;
 }
