@@ -59,16 +59,6 @@ const DashboardPage = () => {
     return <p>Laster...</p>;
   }
 
-  const fixedCategories = summary.fixedExpenseCategoryTotals || [];
-  const fixedLevels = summary.fixedExpenseLevelTotals || [];
-  const bindingSoon = summary.bindingExpirations || [];
-
-  useEffect(() => {
-    setHiddenCategories((current) =>
-      current.filter((category) => fixedCategories.some((item) => item.category === category))
-    );
-  }, [fixedCategories]);
-
   const visibleFixedCategories = useMemo(
     () => fixedCategories.filter((item) => !hiddenCategories.includes(item.category)),
     [fixedCategories, hiddenCategories]
@@ -166,12 +156,16 @@ const DashboardPage = () => {
         }
       : null;
 
+  const tagTotals =
+    summary?.tagTotals && typeof summary.tagTotals === 'object' ? summary.tagTotals : {};
+  const tagKeys = Object.keys(tagTotals);
+  const tagValues = tagKeys.map((key) => tagTotals[key]);
   const tagBarData = {
-    labels: Object.keys(summary.tagTotals),
+    labels: tagKeys,
     datasets: [
       {
         label: 'Netto',
-        data: Object.values(summary.tagTotals),
+        data: tagValues,
         backgroundColor: '#4f46e5'
       }
     ]
@@ -283,7 +277,7 @@ const DashboardPage = () => {
         <Line data={lineData} />
       </div>
 
-      {Object.keys(summary.tagTotals).length > 0 && (
+      {tagKeys.length > 0 && (
         <div className="card insight-card glow-lilac">
           <div className="section-header compact">
             <h2>Tag-analyse</h2>
