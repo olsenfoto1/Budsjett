@@ -1,0 +1,12 @@
+services:
+  budsjett:
+    build:
+      context: .
+    container_name: budsjett
+    ports:
+      - 4173:4173
+    volumes:
+      - budsjett-data:/app/server/data
+
+volumes:
+  budsjett-data: {}
