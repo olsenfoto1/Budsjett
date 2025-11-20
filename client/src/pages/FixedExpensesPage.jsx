@@ -128,6 +128,7 @@ const FixedExpensesPage = () => {
   const [isResettingPriceId, setIsResettingPriceId] = useState(null);
   const [expandedPriceIds, setExpandedPriceIds] = useState([]);
   const [customOwnerInput, setCustomOwnerInput] = useState('');
+  const [bankModeEnabled, setBankModeEnabled] = useState(false);
   const ownerOptions = useMemo(() => {
     const set = new Set();
     expenses.forEach((expense) => {
@@ -187,6 +188,7 @@ const FixedExpensesPage = () => {
         if (!isMounted) return;
         setMonthlyNetIncome(Number(settings.monthlyNetIncome) || 0);
         setOwnerProfiles(Array.isArray(settings.ownerProfiles) ? settings.ownerProfiles : []);
+        setBankModeEnabled(Boolean(settings.bankModeEnabled));
         const defaultOwnerList = Array.isArray(settings.defaultFixedExpensesOwners)
           ? settings.defaultFixedExpensesOwners
           : typeof settings.defaultFixedExpensesOwner === 'string' && settings.defaultFixedExpensesOwner.trim()
@@ -533,16 +535,30 @@ const FixedExpensesPage = () => {
     const map = new Map();
     ownerProfiles.forEach((profile) => {
       if (!profile?.name) return;
-      const value = Number(profile.monthlyNetIncome);
+      const value = bankModeEnabled
+        ? Number(profile.sharedContribution)
+        : Number(profile.monthlyNetIncome);
       if (Number.isFinite(value)) {
         map.set(profile.name, value);
       }
     });
     return map;
-  }, [ownerProfiles]);
+  }, [bankModeEnabled, ownerProfiles]);
+
+  const totalOwnerValue = useMemo(
+    () =>
+      ownerProfiles.reduce(
+        (sum, profile) =>
+          sum + (bankModeEnabled ? Number(profile.sharedContribution) || 0 : Number(profile.monthlyNetIncome) || 0),
+        0
+      ),
+    [bankModeEnabled, ownerProfiles]
+  );
 
   const activeIncome = activeOwners.length
     ? activeOwners.reduce((sum, owner) => sum + (ownerIncomeMap.get(owner) || 0), 0)
+    : bankModeEnabled
+    ? totalOwnerValue
     : monthlyNetIncome;
   const hasIncomeValue = typeof activeIncome === 'number' && Number.isFinite(activeIncome);
   const freeAfterFixed = hasIncomeValue ? activeIncome - totalPerMonth : null;
@@ -556,7 +572,11 @@ const FixedExpensesPage = () => {
   const filterDescription = activeOwners.length
     ? `utgiftene til ${activeOwners.join(', ')}`
     : 'alle faste utgifter';
-  const incomeSourceDescription = activeOwners.length
+  const incomeSourceDescription = bankModeEnabled
+    ? activeOwners.length
+      ? `${activeOwners.join(', ')} sitt bidrag til felleskonto`
+      : 'bidraget til felleskonto'
+    : activeOwners.length
     ? `${activeOwners.join(', ')} sin samlede netto inntekt`
     : 'netto inntekt';
   const showingDefaultOwnerIncome = !hasManualOwnerSelection && defaultOwners.length > 0;

@@ -394,6 +394,7 @@ app.put('/api/settings', (req, res) => {
     ownerProfiles,
     defaultFixedExpensesOwner,
     defaultFixedExpensesOwners,
+    bankModeEnabled,
     lockPassword,
     lockEnabled,
     lockCurrentPassword
@@ -425,7 +426,13 @@ app.put('/api/settings', (req, res) => {
           .status(400)
           .json({ error: 'Netto inntekt for hver person må være et ikke-negativt tall.' });
       }
-      sanitizedProfiles.push({ name, monthlyNetIncome: income });
+      const sharedContribution = Number(profile.sharedContribution ?? profile.sharedContributionPerMonth ?? 0);
+      if (!Number.isFinite(sharedContribution) || sharedContribution < 0) {
+        return res
+          .status(400)
+          .json({ error: 'Bidrag til felleskonto må være et ikke-negativt tall.' });
+      }
+      sanitizedProfiles.push({ name, monthlyNetIncome: income, sharedContribution });
     }
     update.ownerProfiles = sanitizedProfiles;
   }
@@ -457,6 +464,10 @@ app.put('/api/settings', (req, res) => {
         .status(400)
         .json({ error: 'Standardvisning må være et navn eller tom verdi.' });
     }
+  }
+
+  if (bankModeEnabled !== undefined) {
+    update.bankModeEnabled = Boolean(bankModeEnabled);
   }
 
   if (lockPassword !== undefined) {
@@ -517,7 +528,8 @@ app.get('/api/dashboard', (req, res) => {
 
   const fixedExpenseTotal = fixedExpenses.reduce((sum, expense) => sum + (expense.amountPerMonth || 0), 0);
 
-  const ownerIncomeMap = (settings.ownerProfiles || []).reduce((map, profile) => {
+  const ownerProfiles = settings.ownerProfiles || [];
+  const ownerIncomeMap = ownerProfiles.reduce((map, profile) => {
     if (profile?.name) {
       const income = Number(profile.monthlyNetIncome);
       if (Number.isFinite(income)) {
@@ -526,9 +538,22 @@ app.get('/api/dashboard', (req, res) => {
     }
     return map;
   }, new Map());
+  const ownerContributionMap = ownerProfiles.reduce((map, profile) => {
+    if (profile?.name) {
+      const contribution = Number(profile.sharedContribution);
+      if (Number.isFinite(contribution)) {
+        map.set(profile.name, contribution);
+      }
+    }
+    return map;
+  }, new Map());
   const defaultOwners = Array.isArray(settings.defaultFixedExpensesOwners)
     ? settings.defaultFixedExpensesOwners.filter(Boolean)
     : [];
+  const bankModeEnabled = Boolean(settings.bankModeEnabled);
+  const participatingOwners = defaultOwners.length
+    ? defaultOwners
+    : Array.from(new Set(ownerProfiles.map((profile) => profile.name).filter(Boolean)));
   const filteredFixedExpenses = defaultOwners.length
     ? fixedExpenses.filter((expense) =>
         (expense.owners || []).some((owner) => defaultOwners.includes(owner))
@@ -609,10 +634,35 @@ app.get('/api/dashboard', (req, res) => {
     (sum, owner) => sum + (ownerIncomeMap.get(owner) || 0),
     0
   );
-  const activeMonthlyNetIncome = defaultOwners.length && ownersHaveCompleteIncome
+  const bankModeOwnerStats = participatingOwners.map((owner) => {
+    const monthlyNetIncome = ownerIncomeMap.get(owner) || 0;
+    const sharedContribution = ownerContributionMap.get(owner) || 0;
+    return {
+      name: owner,
+      monthlyNetIncome,
+      sharedContribution,
+      remainingPersonal: monthlyNetIncome - sharedContribution
+    };
+  });
+  const bankModeTotalIncome = bankModeOwnerStats.reduce(
+    (sum, owner) => sum + (owner.monthlyNetIncome || 0),
+    0
+  );
+  const bankModeTotalContribution = bankModeOwnerStats.reduce(
+    (sum, owner) => sum + (owner.sharedContribution || 0),
+    0
+  );
+  const activeMonthlyNetIncome = bankModeEnabled
+    ? bankModeTotalContribution
+    : defaultOwners.length && ownersHaveCompleteIncome
     ? ownerIncome
     : monthlyNetIncome;
   const freeAfterFixed = activeMonthlyNetIncome - effectiveFixedExpenseTotal;
+  const bankModeFreeAfterFixed = bankModeTotalContribution - effectiveFixedExpenseTotal;
+  const bankModeRemainingPersonal = bankModeOwnerStats.reduce(
+    (sum, owner) => sum + (owner.remainingPersonal || 0),
+    0
+  );
 
   const categoryTotals = categories.map((category) => ({
     ...category,
@@ -671,6 +721,14 @@ app.get('/api/dashboard', (req, res) => {
     monthlyNetIncome,
     activeMonthlyNetIncome,
     freeAfterFixed,
+    bankModeSummary: {
+      enabled: bankModeEnabled,
+      totalIncome: bankModeTotalIncome,
+      totalContribution: bankModeTotalContribution,
+      freeAfterFixed: bankModeFreeAfterFixed,
+      remainingPersonal: bankModeRemainingPersonal,
+      owners: bankModeOwnerStats
+    },
     effectiveFixedExpenseTotal,
     bindingExpirations,
     fixedExpensesCount: fixedExpenses.length,

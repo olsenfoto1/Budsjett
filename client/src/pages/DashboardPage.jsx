@@ -25,6 +25,8 @@ const DashboardPage = () => {
   const [error, setError] = useState('');
   const [savingsStats, setSavingsStats] = useState(() => summarizeSavingsGoals(loadSavingsGoals()));
   const [hiddenCategories, setHiddenCategories] = useState([]);
+  const bankMode = summary?.bankModeSummary;
+  const bankModeOwners = bankMode?.owners || [];
 
   const fetchSummary = async () => {
     try {
@@ -57,6 +59,10 @@ const DashboardPage = () => {
   const fixedCategories = summary?.fixedExpenseCategoryTotals || [];
   const fixedLevels = summary?.fixedExpenseLevelTotals || [];
   const bindingSoon = summary?.bindingExpirations || [];
+  const bankContribution = bankMode?.totalContribution ?? 0;
+  const bankFreeAfterFixed = bankMode?.freeAfterFixed ?? 0;
+  const bankTotalIncome = bankMode?.totalIncome ?? 0;
+  const bankRemainingPersonal = bankMode?.remainingPersonal ?? 0;
 
   useEffect(() => {
     setHiddenCategories((current) =>
@@ -277,6 +283,58 @@ const DashboardPage = () => {
           )}
         </div>
       </div>
+
+      {bankMode?.enabled && (
+        <div className="card bank-mode-card glow-ocean">
+          <div className="bank-mode-header">
+            <div>
+              <p className="eyebrow">Bank-modus</p>
+              <h3>Felles regningskonto</h3>
+              <p className="muted">Bidragene under styrer felleskontoen som dekker faste kostnader.</p>
+            </div>
+            <div className="bank-mode-totals">
+              <div className="bank-mode-total-tile">
+                <p className="eyebrow">Felles pott</p>
+                <p className="stat">{formatCurrency(bankContribution)}</p>
+                <p className="muted">Av totalt {formatCurrency(bankTotalIncome)} i lønn</p>
+              </div>
+              <div className="bank-mode-total-tile">
+                <p className="eyebrow">Etter faste kostnader</p>
+                <p className="stat" style={{ color: bankFreeAfterFixed >= 0 ? '#16a34a' : '#dc2626' }}>
+                  {formatCurrency(bankFreeAfterFixed)}
+                </p>
+                <p className="muted">Personlig igjen: {formatCurrency(bankRemainingPersonal)}</p>
+              </div>
+            </div>
+          </div>
+          <div className="bank-owner-list">
+            {bankModeOwners.length === 0 && (
+              <p className="muted">Legg til personer og bankbidrag under Innstillinger.</p>
+            )}
+            {bankModeOwners.map((owner) => (
+              <div className="bank-owner-row" key={owner.name}>
+                <div className="owner-avatar small" aria-hidden>
+                  {owner?.name?.charAt(0)?.toUpperCase()}
+                </div>
+                <div>
+                  <p className="owner-name">{owner.name}</p>
+                  <p className="muted">Lønn: {formatCurrency(owner.monthlyNetIncome || 0)}</p>
+                </div>
+                <div className="bank-owner-amounts">
+                  <div>
+                    <p className="eyebrow">Til felleskonto</p>
+                    <p className="stat-subtle">{formatCurrency(owner.sharedContribution || 0)}</p>
+                  </div>
+                  <div>
+                    <p className="eyebrow">Igjen privat</p>
+                    <p className="stat-subtle">{formatCurrency(owner.remainingPersonal || 0)}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="card-grid">
         <div className="card insight-card glow-lilac">

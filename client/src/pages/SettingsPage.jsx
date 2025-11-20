@@ -28,6 +28,10 @@ const SettingsPage = () => {
   const [isUpdatingLock, setIsUpdatingLock] = useState(false);
   const [cacheStatus, setCacheStatus] = useState('');
   const [isClearingCache, setIsClearingCache] = useState(false);
+  const [bankModeEnabled, setBankModeEnabled] = useState(false);
+  const [bankModeStatus, setBankModeStatus] = useState('');
+  const [bankModeError, setBankModeError] = useState('');
+  const [isUpdatingBankMode, setIsUpdatingBankMode] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -38,7 +42,10 @@ const SettingsPage = () => {
         const normalized = {};
         (data.ownerProfiles || []).forEach((profile) => {
           if (profile?.name) {
-            normalized[profile.name] = String(profile.monthlyNetIncome ?? '');
+            normalized[profile.name] = {
+              income: String(profile.monthlyNetIncome ?? ''),
+              shared: String(profile.sharedContribution ?? '')
+            };
           }
         });
         setOwnerInputs(normalized);
@@ -49,6 +56,7 @@ const SettingsPage = () => {
           : [];
         setDefaultOwners(defaults);
         setLockEnabled(Boolean(data.lockEnabled));
+        setBankModeEnabled(Boolean(data.bankModeEnabled));
       } catch (err) {
         if (!isMounted) return;
         setOwnerError('Kunne ikke hente personer: ' + err.message);
@@ -109,7 +117,10 @@ const SettingsPage = () => {
       const refreshed = {};
       payload.ownerProfiles.forEach((profile) => {
         if (profile?.name) {
-          refreshed[profile.name] = String(profile.monthlyNetIncome ?? '');
+          refreshed[profile.name] = {
+            income: String(profile.monthlyNetIncome ?? ''),
+            shared: String(profile.sharedContribution ?? '')
+          };
         }
       });
       setOwnerInputs(refreshed);
@@ -132,7 +143,17 @@ const SettingsPage = () => {
   };
 
   const handleOwnerIncomeChange = (name, value) => {
-    setOwnerInputs((current) => ({ ...current, [name]: value }));
+    setOwnerInputs((current) => ({
+      ...current,
+      [name]: { ...(current[name] || {}), income: value }
+    }));
+  };
+
+  const handleOwnerSharedChange = (name, value) => {
+    setOwnerInputs((current) => ({
+      ...current,
+      [name]: { ...(current[name] || {}), shared: value }
+    }));
   };
 
   const handleAddOwner = (event) => {
@@ -148,7 +169,7 @@ const SettingsPage = () => {
       if (Object.prototype.hasOwnProperty.call(current, trimmed)) {
         return current;
       }
-      return { ...current, [trimmed]: '' };
+      return { ...current, [trimmed]: { income: '', shared: '' } };
     });
     setNewOwnerName('');
   };
@@ -163,11 +184,15 @@ const SettingsPage = () => {
         .filter(([, value]) => value !== '' && value !== null && value !== undefined)
         .map(([name, value]) => {
           const trimmedName = name.trim();
-          const numericValue = Number(value);
-          if (!Number.isFinite(numericValue) || numericValue < 0) {
+          const numericIncome = Number(value?.income ?? value);
+          if (!Number.isFinite(numericIncome) || numericIncome < 0) {
             throw new Error(`Beløpet for ${trimmedName} må være et ikke-negativt tall.`);
           }
-          return { name: trimmedName, monthlyNetIncome: numericValue };
+          const numericShared = Number(value?.shared ?? 0);
+          if (!Number.isFinite(numericShared) || numericShared < 0) {
+            throw new Error(`Bidraget for ${trimmedName} må være et ikke-negativt tall.`);
+          }
+          return { name: trimmedName, monthlyNetIncome: numericIncome, sharedContribution: numericShared };
         });
       const updated = await api.updateSettings({ ownerProfiles: payload });
       syncOwnersFromPayload(updated);
@@ -339,6 +364,25 @@ const SettingsPage = () => {
       ? defaultOwners.filter((owner) => owner !== trimmed)
       : [...defaultOwners, trimmed];
     await handleUpdateDefaultOwners(next);
+  };
+
+  const handleToggleBankMode = async () => {
+    setBankModeStatus('');
+    setBankModeError('');
+    setIsUpdatingBankMode(true);
+    try {
+      const updated = await api.updateSettings({ bankModeEnabled: !bankModeEnabled });
+      setBankModeEnabled(Boolean(updated.bankModeEnabled));
+      setBankModeStatus(
+        updated.bankModeEnabled
+          ? 'Bank-modus er aktivert. Angi bidrag på hver person nedenfor.'
+          : 'Bank-modus er slått av.'
+      );
+    } catch (err) {
+      setBankModeError(err.message || 'Kunne ikke oppdatere bank-modus.');
+    } finally {
+      setIsUpdatingBankMode(false);
+    }
   };
 
   const handleExport = async () => {
@@ -554,6 +598,31 @@ const SettingsPage = () => {
             </div>
           </div>
 
+          <div className="bank-mode-toggle">
+            <div>
+              <p className="eyebrow">Bank-modus</p>
+              <h4>Felles regningskonto</h4>
+              <p className="muted">
+                Aktiver for å fordele lønn og hvor mye hver person legger inn på felleskontoen per måned.
+              </p>
+              {(bankModeStatus || bankModeError) && (
+                <p className={bankModeError ? 'error-text' : 'success-text'}>
+                  {bankModeError || bankModeStatus}
+                </p>
+              )}
+            </div>
+            <div className="bank-mode-actions">
+              <span className="badge neutral">{bankModeEnabled ? 'På' : 'Av'}</span>
+              <button type="button" onClick={handleToggleBankMode} disabled={isUpdatingBankMode}>
+                {isUpdatingBankMode
+                  ? 'Oppdaterer…'
+                  : bankModeEnabled
+                  ? 'Slå av bank-modus'
+                  : 'Aktiver bank-modus'}
+              </button>
+            </div>
+          </div>
+
           {ownersLoading && <p className="muted">Laster personer…</p>}
           {!ownersLoading && ownerNames.length === 0 && (
             <div className="empty-owner-state">
@@ -608,11 +677,32 @@ const SettingsPage = () => {
                               type="number"
                               min="0"
                               placeholder="0"
-                              value={ownerInputs[name] ?? ''}
+                              value={ownerInputs[name]?.income ?? ownerInputs[name] ?? ''}
                               onChange={(e) => handleOwnerIncomeChange(name, e.target.value)}
                             />
                           </div>
                         </div>
+                        {bankModeEnabled && (
+                          <div className="owner-income-input">
+                            <label className="muted" htmlFor={`owner-shared-${name}`}>
+                              Til felleskonto
+                            </label>
+                            <div className="currency-input">
+                              <span className="currency-prefix">kr</span>
+                              <input
+                                id={`owner-shared-${name}`}
+                                type="number"
+                                min="0"
+                                placeholder="0"
+                                value={ownerInputs[name]?.shared ?? ''}
+                                onChange={(e) => handleOwnerSharedChange(name, e.target.value)}
+                              />
+                            </div>
+                            <p className="muted owner-income-hint">
+                              Trekkes fra personlig lønn og legges i fellespotten.
+                            </p>
+                          </div>
+                        )}
                         <div className="owner-action-buttons">
                           {isEditing ? (
                             <>

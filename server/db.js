@@ -12,6 +12,7 @@ const DEFAULT_SETTINGS = {
   ownerProfiles: [],
   defaultFixedExpensesOwner: '',
   defaultFixedExpensesOwners: [],
+  bankModeEnabled: false,
   lockEnabled: false,
   lockSalt: '',
   lockHash: ''
@@ -90,6 +91,10 @@ class Store {
           : '';
       if (legacyDefault && !this.state.settings.defaultFixedExpensesOwners.length) {
         this.state.settings.defaultFixedExpensesOwners = [legacyDefault];
+      }
+
+      if (typeof this.state.settings.bankModeEnabled !== 'boolean') {
+        this.state.settings.bankModeEnabled = false;
       }
       this.state.settings.defaultFixedExpensesOwner =
         this.state.settings.defaultFixedExpensesOwners[0] || '';
@@ -189,11 +194,13 @@ class Store {
       if (!profile || typeof profile.name !== 'string') return;
       const name = profile.name.trim();
       if (!name) return;
-      const value = Number(profile.monthlyNetIncome);
-      const income = Number.isFinite(value) && value >= 0 ? value : 0;
-      map.set(name, income);
+      const incomeValue = Number(profile.monthlyNetIncome);
+      const income = Number.isFinite(incomeValue) && incomeValue >= 0 ? incomeValue : 0;
+      const sharedValue = Number(profile.sharedContribution ?? profile.sharedContributionPerMonth);
+      const sharedContribution = Number.isFinite(sharedValue) && sharedValue >= 0 ? sharedValue : 0;
+      map.set(name, { monthlyNetIncome: income, sharedContribution });
     });
-    return Array.from(map.entries()).map(([name, monthlyNetIncome]) => ({ name, monthlyNetIncome }));
+    return Array.from(map.entries()).map(([name, values]) => ({ name, ...values }));
   }
 
   normalizeDefaultOwnerList(value) {
@@ -526,6 +533,9 @@ class Store {
     if (typeof this.state.settings.defaultFixedExpensesOwner !== 'string') {
       this.state.settings.defaultFixedExpensesOwner = '';
     }
+    if (typeof this.state.settings.bankModeEnabled !== 'boolean') {
+      this.state.settings.bankModeEnabled = false;
+    }
     if (
       !this.state.settings.defaultFixedExpensesOwners.length &&
       this.state.settings.defaultFixedExpensesOwner.trim()
@@ -546,6 +556,10 @@ class Store {
       monthlyNetIncome:
         Number(payload.monthlyNetIncome ?? current.monthlyNetIncome ?? DEFAULT_SETTINGS.monthlyNetIncome) || 0
     };
+
+    if (payload.bankModeEnabled !== undefined) {
+      next.bankModeEnabled = Boolean(payload.bankModeEnabled);
+    }
 
     if (payload.ownerProfiles !== undefined) {
       next.ownerProfiles = this.normalizeOwnerProfiles(payload.ownerProfiles);
@@ -633,13 +647,15 @@ class Store {
       const name = profile.name === from ? to : profile.name;
       if (!name) return;
       const income = Number(profile.monthlyNetIncome) || 0;
+      const sharedContribution = Number(profile.sharedContribution) || 0;
       if (!renamedProfilesMap.has(name)) {
-        renamedProfilesMap.set(name, income);
+        renamedProfilesMap.set(name, { monthlyNetIncome: income, sharedContribution });
       }
     });
-    const nextProfiles = Array.from(renamedProfilesMap.entries()).map(([name, monthlyNetIncome]) => ({
+    const nextProfiles = Array.from(renamedProfilesMap.entries()).map(([name, values]) => ({
       name,
-      monthlyNetIncome
+      monthlyNetIncome: values.monthlyNetIncome,
+      sharedContribution: values.sharedContribution
     }));
     if (JSON.stringify(nextProfiles) !== JSON.stringify(ownerProfiles)) {
       changed = true;
@@ -774,6 +790,7 @@ class Store {
       ownerProfiles: this.normalizeOwnerProfiles(settingsPayload.ownerProfiles || settingsPayload.ownerprofiles),
       defaultFixedExpensesOwner: defaultOwnersFromPayload[0] || '',
       defaultFixedExpensesOwners: defaultOwnersFromPayload,
+      bankModeEnabled: Boolean(settingsPayload.bankModeEnabled),
       lockEnabled: Boolean(settingsPayload.lockEnabled),
       lockSalt: typeof settingsPayload.lockSalt === 'string' ? settingsPayload.lockSalt : '',
       lockHash: typeof settingsPayload.lockHash === 'string' ? settingsPayload.lockHash : ''
