@@ -599,6 +599,49 @@ main {
   gap: 0.5rem;
 }
 
+.loading-section {
+  --category-accent: rgba(148, 163, 184, 0.18);
+  --category-accent-strong: rgba(148, 163, 184, 0.28);
+  --category-border: rgba(148, 163, 184, 0.3);
+  color: var(--text-secondary);
+}
+
+.skeleton {
+  border-radius: 999px;
+  background: linear-gradient(120deg, rgba(148, 163, 184, 0.18), rgba(148, 163, 184, 0.28), rgba(148, 163, 184, 0.18));
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+.skeleton-title {
+  width: 180px;
+  height: 1.4rem;
+}
+
+.skeleton-pill {
+  display: inline-block;
+  width: 90px;
+  height: 1rem;
+}
+
+.skeleton-block {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.75rem;
+  border-radius: 0.85rem;
+  background: var(--surface-soft);
+  border: 1px dashed rgba(148, 163, 184, 0.35);
+}
+
+.skeleton-line {
+  height: 0.9rem;
+  width: 100%;
+}
+
+.skeleton-line.short {
+  width: 55%;
+}
+
 .expense-entry {
   position: relative;
   border: 1px solid rgba(148, 163, 184, 0.35);
@@ -757,6 +800,15 @@ th {
 .subtle-label {
   font-size: 0.8rem;
   white-space: nowrap;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 button {

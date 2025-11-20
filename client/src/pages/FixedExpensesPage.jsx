@@ -107,6 +107,7 @@ const FixedExpensesPage = () => {
   const [categoryColorMap, setCategoryColorMap] = useState(() => ({ ...FALLBACK_CATEGORY_COLORS }));
   const [categoryError, setCategoryError] = useState('');
   const [hiddenCategories, setHiddenCategories] = useState([]);
+  const [isLoadingExpenses, setIsLoadingExpenses] = useState(true);
   const [isLoadingCategories, setIsLoadingCategories] = useState(false);
   const [bulkOwnersInput, setBulkOwnersInput] = useState('');
   const [bulkOwnersError, setBulkOwnersError] = useState('');
@@ -141,11 +142,14 @@ const FixedExpensesPage = () => {
   }, [categoryOptions, form.category]);
 
   const fetchExpenses = async () => {
+    setIsLoadingExpenses(true);
     try {
       const data = await api.getFixedExpenses();
       setExpenses(data.sort((a, b) => (b.amountPerMonth || 0) - (a.amountPerMonth || 0)));
     } catch (err) {
       setError(err.message);
+    } finally {
+      setIsLoadingExpenses(false);
     }
   };
 
@@ -725,75 +729,96 @@ const FixedExpensesPage = () => {
         </div>
       </div>
       <div className="category-sections">
-        {groupedExpenses.length === 0 && <p className="muted">Ingen registrerte utgifter ennå.</p>}
-        {groupedExpenses.map((group) => {
-          const categoryStyle = getCategoryStyle(group.category);
-          return (
-            <section className="category-section" key={group.category} style={categoryStyle}>
-              <div className="category-section-header">
-                <div>
-                  <h3>{group.category}</h3>
-                  <p className="muted">{group.items.length} avtaler</p>
-                </div>
-                <div className="category-total">
-                  <span className="muted">Sum</span>
-                  <strong>{formatCurrency(group.total)}</strong>
-                </div>
+        {isLoadingExpenses && (
+          <section className="category-section loading-section">
+            <div className="category-section-header">
+              <div className="skeleton skeleton-title" aria-hidden />
+              <div className="category-total">
+                <span className="skeleton skeleton-pill" aria-hidden />
               </div>
-              <div className="category-expense-list">
-                {group.items.map((expense) => (
-                  <article className="expense-entry" key={expense.id}>
-                    <div className="expense-entry-main">
-                      <div>
-                        <p className="expense-name">{expense.name}</p>
-                        {expense.startDate && (
-                          <small className="muted subtle-label">Startet {formatDate(expense.startDate)}</small>
-                        )}
-                        <div className="expense-meta">
-                          <span className="badge">{expense.level}</span>
-                          <span className="muted">Binding: {formatDate(expense.bindingEndDate)}</span>
-                          <span className="muted">Oppsigelse: {formatNotice(expense.noticePeriodMonths)}</span>
-                        </div>
-                        <div className="expense-owners">
-                          {(expense.owners || []).length === 0 ? (
-                            <span className="muted">Ingen eiere</span>
-                          ) : (
-                            <div className="chip-list">
-                              {(expense.owners || []).map((owner) => (
-                                <button
-                                  type="button"
-                                  className={`chip chip-button${activeOwners.includes(owner) ? ' chip-active' : ''}`}
-                                  key={owner}
-                                  onClick={() => handleToggleOwnerFilter(owner)}
-                                >
-                                  {owner}
-                                </button>
-                              ))}
-                            </div>
+            </div>
+            <div className="category-expense-list">
+              {[1, 2, 3].map((placeholder) => (
+                <div className="expense-entry skeleton-block" key={placeholder} aria-hidden>
+                  <div className="skeleton skeleton-line" />
+                  <div className="skeleton skeleton-line short" />
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+        {!isLoadingExpenses && groupedExpenses.length === 0 && (
+          <p className="muted">Ingen registrerte utgifter ennå.</p>
+        )}
+        {!isLoadingExpenses &&
+          groupedExpenses.map((group) => {
+            const categoryStyle = getCategoryStyle(group.category);
+            return (
+              <section className="category-section" key={group.category} style={categoryStyle}>
+                <div className="category-section-header">
+                  <div>
+                    <h3>{group.category}</h3>
+                    <p className="muted">{group.items.length} avtaler</p>
+                  </div>
+                  <div className="category-total">
+                    <span className="muted">Sum</span>
+                    <strong>{formatCurrency(group.total)}</strong>
+                  </div>
+                </div>
+                <div className="category-expense-list">
+                  {group.items.map((expense) => (
+                    <article className="expense-entry" key={expense.id}>
+                      <div className="expense-entry-main">
+                        <div>
+                          <p className="expense-name">{expense.name}</p>
+                          {expense.startDate && (
+                            <small className="muted subtle-label">Startet {formatDate(expense.startDate)}</small>
                           )}
+                          <div className="expense-meta">
+                            <span className="badge">{expense.level}</span>
+                            <span className="muted">Binding: {formatDate(expense.bindingEndDate)}</span>
+                            <span className="muted">Oppsigelse: {formatNotice(expense.noticePeriodMonths)}</span>
+                          </div>
+                          <div className="expense-owners">
+                            {(expense.owners || []).length === 0 ? (
+                              <span className="muted">Ingen eiere</span>
+                            ) : (
+                              <div className="chip-list">
+                                {(expense.owners || []).map((owner) => (
+                                  <button
+                                    type="button"
+                                    className={`chip chip-button${activeOwners.includes(owner) ? ' chip-active' : ''}`}
+                                    key={owner}
+                                    onClick={() => handleToggleOwnerFilter(owner)}
+                                  >
+                                    {owner}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          {expense.note && <p className="expense-note">{expense.note}</p>}
                         </div>
-                        {expense.note && <p className="expense-note">{expense.note}</p>}
+                        <div className="expense-amount">
+                          <span className="muted">Per måned</span>
+                          <strong>{formatCurrency(expense.amountPerMonth)}</strong>
+                        </div>
                       </div>
-                      <div className="expense-amount">
-                        <span className="muted">Per måned</span>
-                        <strong>{formatCurrency(expense.amountPerMonth)}</strong>
+                      <div className="expense-actions">
+                        <button className="secondary" onClick={() => setSimulatedExpense(expense)}>
+                          Simuler oppsigelse
+                        </button>
+                        <button className="secondary" onClick={() => handleOpenForm(expense)}>
+                          Rediger
+                        </button>
+                        <button onClick={() => handleDelete(expense.id)}>Slett</button>
                       </div>
-                    </div>
-                    <div className="expense-actions">
-                      <button className="secondary" onClick={() => setSimulatedExpense(expense)}>
-                        Simuler oppsigelse
-                      </button>
-                      <button className="secondary" onClick={() => handleOpenForm(expense)}>
-                        Rediger
-                      </button>
-                      <button onClick={() => handleDelete(expense.id)}>Slett</button>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </section>
-          );
-        })}
+                    </article>
+                  ))}
+                </div>
+              </section>
+            );
+          })}
       </div>
 
       <div className="card insight-card glow-sand bulk-update-card">
