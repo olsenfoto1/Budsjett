@@ -480,10 +480,16 @@ app.put('/api/settings', (req, res) => {
   }
 
   const updated = db.updateSettings(update);
+  const sanitizedSettings = sanitizeSettings(updated);
   if (shouldInvalidateLockSessions) {
     invalidateLockTokens();
+    if (sanitizedSettings.lockEnabled) {
+      issueLockToken(res);
+    } else {
+      res.clearCookie(LOCK_COOKIE_NAME);
+    }
   }
-  res.json(sanitizeSettings(updated));
+  res.json(sanitizedSettings);
 });
 
 app.get('/api/dashboard', (req, res) => {
