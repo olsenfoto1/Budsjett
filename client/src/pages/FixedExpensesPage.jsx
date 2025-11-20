@@ -132,6 +132,8 @@ const FixedExpensesPage = () => {
   const [bankModeEnabled, setBankModeEnabled] = useState(false);
   const [bankAccounts, setBankAccounts] = useState([]);
   const [selectedAccounts, setSelectedAccounts] = useState([]);
+  const [defaultAccount, setDefaultAccount] = useState('');
+  const [hasManualAccountSelection, setHasManualAccountSelection] = useState(false);
   const ownerOptions = useMemo(() => {
     const set = new Set();
     expenses.forEach((expense) => {
@@ -199,6 +201,11 @@ const FixedExpensesPage = () => {
           ? [settings.defaultFixedExpensesOwner.trim()]
           : [];
         setDefaultOwners(defaultOwnerList);
+        setDefaultAccount(
+          typeof settings.defaultFixedExpensesBankAccount === 'string'
+            ? settings.defaultFixedExpensesBankAccount.trim()
+            : ''
+        );
         setSettingsError('');
       } catch (err) {
         if (!isMounted) return;
@@ -252,7 +259,10 @@ const FixedExpensesPage = () => {
 
   useEffect(() => {
     setSelectedAccounts((current) => current.filter((account) => bankAccounts.includes(account)));
-  }, [bankAccounts]);
+    if (defaultAccount && !bankAccounts.includes(defaultAccount)) {
+      setDefaultAccount('');
+    }
+  }, [bankAccounts, defaultAccount]);
 
   const getCategoryStyle = useCallback(
     (categoryName) => {
@@ -273,7 +283,15 @@ const FixedExpensesPage = () => {
     [hasManualOwnerSelection, selectedOwners, defaultOwners]
   );
 
-  const hasAccountFilter = bankModeEnabled && selectedAccounts.length > 0;
+  const activeAccounts = useMemo(() => {
+    if (!bankModeEnabled) return [];
+    if (hasManualAccountSelection) {
+      return selectedAccounts;
+    }
+    return defaultAccount ? [defaultAccount] : [];
+  }, [bankModeEnabled, defaultAccount, hasManualAccountSelection, selectedAccounts]);
+
+  const hasAccountFilter = bankModeEnabled && activeAccounts.length > 0;
 
   const filteredExpenses = useMemo(() => {
     const hasOwnerFilter = activeOwners.length > 0;
@@ -283,7 +301,7 @@ const FixedExpensesPage = () => {
     return expenses.filter((expense) => {
       const matchesOwner = !hasOwnerFilter
         || (expense.owners || []).some((owner) => activeOwners.includes(owner));
-      const matchesAccount = !hasAccountFilter || selectedAccounts.includes(expense.account);
+      const matchesAccount = !hasAccountFilter || activeAccounts.includes(expense.account);
 
       if (hasOwnerFilter && hasAccountFilter) {
         return matchesOwner || matchesAccount;
@@ -291,7 +309,7 @@ const FixedExpensesPage = () => {
 
       return matchesOwner && matchesAccount;
     });
-  }, [expenses, activeOwners, hasAccountFilter, selectedAccounts]);
+  }, [expenses, activeOwners, activeAccounts, hasAccountFilter]);
 
   const categoryTotals = useMemo(() => {
     const map = new Map();
@@ -595,10 +613,10 @@ const FixedExpensesPage = () => {
       ? `utgiftene til ${activeOwners.join(', ')}`
       : 'alle faste utgifter';
     if (hasAccountFilter) {
-      return `${ownerDescription} fra ${selectedAccounts.join(', ')}`;
+      return `${ownerDescription} fra ${activeAccounts.join(', ')}`;
     }
     return ownerDescription;
-  }, [activeOwners, hasAccountFilter, selectedAccounts]);
+  }, [activeOwners, activeAccounts, hasAccountFilter]);
   const incomeSourceDescription = bankModeEnabled
     ? activeOwners.length
       ? `${activeOwners.join(', ')} sitt bidrag til felleskonto`
@@ -615,10 +633,10 @@ const FixedExpensesPage = () => {
       labels.push(activeOwners.join(', '));
     }
     if (hasAccountFilter) {
-      labels.push(`konto: ${selectedAccounts.join(', ')}`);
+      labels.push(`konto: ${activeAccounts.join(', ')}`);
     }
     return labels;
-  }, [activeOwners, hasAccountFilter, manualFilterActive, selectedAccounts]);
+  }, [activeOwners, activeAccounts, hasAccountFilter, manualFilterActive]);
 
   const handleOpenForm = (expense) => {
     // Hent alltid siste kategorier når skjemaet åpnes
@@ -643,7 +661,7 @@ const FixedExpensesPage = () => {
         createEmptyForm(
           categoryOptions[0] || FALLBACK_CATEGORY_OPTIONS[0],
           defaultOwners,
-          bankAccounts[0] || ''
+          defaultAccount || bankAccounts[0] || ''
         )
       );
     }
@@ -657,12 +675,12 @@ const FixedExpensesPage = () => {
       createEmptyForm(
         categoryOptions[0] || FALLBACK_CATEGORY_OPTIONS[0],
         defaultOwners,
-        bankAccounts[0] || ''
+        defaultAccount || bankAccounts[0] || ''
       )
     );
     setEditingId(null);
     setCustomOwnerInput('');
-  }, [bankAccounts, categoryOptions, defaultOwners]);
+  }, [bankAccounts, categoryOptions, defaultAccount, defaultOwners]);
 
   const handleToggleOwnerFilter = useCallback(
     (owner) => {
@@ -681,19 +699,26 @@ const FixedExpensesPage = () => {
   const handleToggleAccountFilter = useCallback(
     (account) => {
       setSelectedAccounts((current) => {
-        if (current.includes(account)) {
-          return current.filter((item) => item !== account);
+        const baseline = hasManualAccountSelection
+          ? current
+          : defaultAccount
+          ? [defaultAccount]
+          : [];
+        if (baseline.includes(account)) {
+          return baseline.filter((item) => item !== account);
         }
-        return [...current, account];
+        return [...baseline, account];
       });
+      setHasManualAccountSelection(true);
     },
-    []
+    [defaultAccount, hasManualAccountSelection]
   );
 
   const clearFilters = useCallback(() => {
     setSelectedOwners([]);
     setHasManualOwnerSelection(false);
     setSelectedAccounts([]);
+    setHasManualAccountSelection(false);
   }, []);
 
   const handleSubmit = async (event) => {
@@ -904,7 +929,7 @@ const FixedExpensesPage = () => {
               <button
                 type="button"
                 key={account}
-                className={`chip chip-button${selectedAccounts.includes(account) ? ' chip-active' : ''}`}
+                className={`chip chip-button${activeAccounts.includes(account) ? ' chip-active' : ''}`}
                 onClick={() => handleToggleAccountFilter(account)}
               >
                 {account}

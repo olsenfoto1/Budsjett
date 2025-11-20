@@ -12,6 +12,7 @@ const DEFAULT_SETTINGS = {
   ownerProfiles: [],
   defaultFixedExpensesOwner: '',
   defaultFixedExpensesOwners: [],
+  defaultFixedExpensesBankAccount: '',
   bankAccounts: [],
   bankModeEnabled: false,
   lockEnabled: false,
@@ -106,6 +107,19 @@ class Store {
       this.state.settings.bankAccounts = this.normalizeBankAccounts(
         this.state.settings.bankAccounts || []
       );
+
+      if (typeof this.state.settings.defaultFixedExpensesBankAccount !== 'string') {
+        this.state.settings.defaultFixedExpensesBankAccount = '';
+      }
+
+      const bankAccountSet = new Set(this.state.settings.bankAccounts);
+      if (!bankAccountSet.has(this.state.settings.defaultFixedExpensesBankAccount)) {
+        this.state.settings.defaultFixedExpensesBankAccount = '';
+      }
+
+      if (!this.state.settings.bankModeEnabled) {
+        this.state.settings.defaultFixedExpensesBankAccount = '';
+      }
 
       if (typeof this.state.settings.lockEnabled !== 'boolean') {
         this.state.settings.lockEnabled = false;
@@ -649,7 +663,20 @@ class Store {
 
     next.bankAccounts = this.normalizeBankAccounts(next.bankAccounts);
 
+    if (payload.defaultFixedExpensesBankAccount !== undefined) {
+      next.defaultFixedExpensesBankAccount =
+        typeof payload.defaultFixedExpensesBankAccount === 'string'
+          ? payload.defaultFixedExpensesBankAccount.trim()
+          : '';
+    } else if (typeof next.defaultFixedExpensesBankAccount !== 'string') {
+      next.defaultFixedExpensesBankAccount = '';
+    }
+
     const validAccounts = new Set(next.bankAccounts);
+
+    if (!validAccounts.has(next.defaultFixedExpensesBankAccount)) {
+      next.defaultFixedExpensesBankAccount = '';
+    }
 
     if (Array.isArray(next.ownerProfiles)) {
       next.ownerProfiles = next.ownerProfiles.map((profile) => {
@@ -668,6 +695,10 @@ class Store {
           sharedContribution: totalContribution > 0 ? totalContribution : profile.sharedContribution
         };
       });
+    }
+
+    if (!next.bankModeEnabled) {
+      next.defaultFixedExpensesBankAccount = '';
     }
 
     const now = new Date().toISOString();

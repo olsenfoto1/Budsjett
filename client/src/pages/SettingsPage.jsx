@@ -16,6 +16,10 @@ const SettingsPage = () => {
   const [defaultOwnerStatus, setDefaultOwnerStatus] = useState('');
   const [defaultOwnerError, setDefaultOwnerError] = useState('');
   const [isUpdatingDefaultOwner, setIsUpdatingDefaultOwner] = useState(false);
+  const [defaultAccount, setDefaultAccount] = useState('');
+  const [defaultAccountStatus, setDefaultAccountStatus] = useState('');
+  const [defaultAccountError, setDefaultAccountError] = useState('');
+  const [isUpdatingDefaultAccount, setIsUpdatingDefaultAccount] = useState(false);
   const [editingOwner, setEditingOwner] = useState('');
   const [editedOwnerName, setEditedOwnerName] = useState('');
   const [ownerActionLoading, setOwnerActionLoading] = useState('');
@@ -62,6 +66,11 @@ const SettingsPage = () => {
           ? [data.defaultFixedExpensesOwner.trim()]
           : [];
         setDefaultOwners(defaults);
+        setDefaultAccount(
+          typeof data.defaultFixedExpensesBankAccount === 'string'
+            ? data.defaultFixedExpensesBankAccount.trim()
+            : ''
+        );
         setLockEnabled(Boolean(data.lockEnabled));
         setBankModeEnabled(Boolean(data.bankModeEnabled));
         const accounts = Array.isArray(data.bankAccounts) ? data.bankAccounts : [];
@@ -143,6 +152,12 @@ const SettingsPage = () => {
     syncOwnerBankContributions(bankAccountsDraft);
   }, [bankAccountsDraft, syncOwnerBankContributions]);
 
+  useEffect(() => {
+    if (defaultAccount && !bankAccountsDraft.includes(defaultAccount)) {
+      setDefaultAccount('');
+    }
+  }, [bankAccountsDraft, defaultAccount]);
+
   const syncOwnersFromPayload = (payload = {}) => {
     if (Array.isArray(payload.ownerProfiles)) {
       const refreshed = {};
@@ -160,6 +175,10 @@ const SettingsPage = () => {
 
     if (Array.isArray(payload.defaultFixedExpensesOwners)) {
       setDefaultOwners(payload.defaultFixedExpensesOwners);
+    }
+
+    if (typeof payload.defaultFixedExpensesBankAccount === 'string') {
+      setDefaultAccount(payload.defaultFixedExpensesBankAccount.trim());
     }
 
     if (Array.isArray(payload.fixedExpenses)) {
@@ -422,7 +441,38 @@ const SettingsPage = () => {
     } catch (err) {
       setDefaultOwnerError(err.message || 'Kunne ikke oppdatere standardvisningen.');
     } finally {
-      setIsUpdatingDefaultOwner(false);
+    setIsUpdatingDefaultOwner(false);
+    }
+  };
+
+  const handleUpdateDefaultAccount = async (account) => {
+    setDefaultAccountStatus('');
+    setDefaultAccountError('');
+    if (!bankModeEnabled) {
+      setDefaultAccountError('Aktiver bank-modus for å sette en standardkonto.');
+      return;
+    }
+    const trimmed = typeof account === 'string' ? account.trim() : '';
+    if (trimmed && !bankAccountsDraft.includes(trimmed)) {
+      setDefaultAccountError('Velg en konto fra listen over bankkontoer.');
+      return;
+    }
+    setIsUpdatingDefaultAccount(true);
+    try {
+      const updated = await api.updateSettings({ defaultFixedExpensesBankAccount: trimmed });
+      const next = typeof updated.defaultFixedExpensesBankAccount === 'string'
+        ? updated.defaultFixedExpensesBankAccount.trim()
+        : '';
+      setDefaultAccount(next);
+      if (next) {
+        setDefaultAccountStatus(`${next} er satt som standardkonto for faste utgifter.`);
+      } else {
+        setDefaultAccountStatus('Standardkonto fjernet.');
+      }
+    } catch (err) {
+      setDefaultAccountError(err.message || 'Kunne ikke oppdatere standardkonto.');
+    } finally {
+      setIsUpdatingDefaultAccount(false);
     }
   };
 
@@ -1003,6 +1053,58 @@ const SettingsPage = () => {
                     );
                   })}
                 </div>
+                {bankModeEnabled && bankAccountsDraft.length > 0 && (
+                  <div className="owner-default-bank">
+                    <div className="owner-panel-header" style={{ marginTop: '1rem' }}>
+                      <div>
+                        <p className="eyebrow">Felleskonto</p>
+                        <h4>Standardkonto</h4>
+                        <p className="muted">
+                          Velg hvilken konto som skal være forhåndsvalgt i Faste utgifter når bank-modus er aktivert.
+                        </p>
+                      </div>
+                      {defaultAccount && <span className="stat-chip success">1 valgt</span>}
+                    </div>
+                    <div className="owner-default-chips">
+                      {bankAccountsDraft.map((account) => {
+                        const isSelected = defaultAccount === account;
+                        return (
+                          <button
+                            key={`${account}-default`}
+                            type="button"
+                            className={`owner-chip ${isSelected ? 'selected' : ''}`}
+                            onClick={() => handleUpdateDefaultAccount(isSelected ? '' : account)}
+                            disabled={isUpdatingDefaultAccount}
+                          >
+                            <span className="owner-chip-initial" aria-hidden>
+                              {account.charAt(0).toUpperCase()}
+                            </span>
+                            <span className="owner-chip-name">{account}</span>
+                            <span className="owner-chip-status">
+                              {isSelected ? 'Standardkonto' : 'Tilgjengelig'}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="owner-default-footer">
+                      {defaultAccount && (
+                        <button
+                          type="button"
+                          className="ghost"
+                          onClick={() => handleUpdateDefaultAccount('')}
+                          disabled={isUpdatingDefaultAccount}
+                        >
+                          Fjern standardkonto
+                        </button>
+                      )}
+                      {defaultAccountStatus && (
+                        <p className="muted success-text">{defaultAccountStatus}</p>
+                      )}
+                      {defaultAccountError && <p className="error-text">{defaultAccountError}</p>}
+                    </div>
+                  </div>
+                )}
                 <div className="owner-default-footer">
                   {defaultOwners.length > 0 && (
                     <button

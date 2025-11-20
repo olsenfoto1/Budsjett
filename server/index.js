@@ -399,6 +399,7 @@ app.put('/api/settings', (req, res) => {
     ownerProfiles,
     defaultFixedExpensesOwner,
     defaultFixedExpensesOwners,
+    defaultFixedExpensesBankAccount,
     bankAccounts,
     bankModeEnabled,
     lockPassword,
@@ -522,6 +523,27 @@ app.put('/api/settings', (req, res) => {
       )
     );
     update.bankAccounts = sanitizedAccounts;
+  }
+
+  const effectiveBankAccounts = Array.isArray(update.bankAccounts)
+    ? update.bankAccounts
+    : currentBankAccounts;
+
+  if (defaultFixedExpensesBankAccount !== undefined) {
+    if (typeof defaultFixedExpensesBankAccount !== 'string') {
+      return res.status(400).json({ error: 'Standardkontoen må være en tekstverdi.' });
+    }
+    const trimmed = defaultFixedExpensesBankAccount.trim();
+    if (trimmed && !effectiveBankAccounts.includes(trimmed)) {
+      return res
+        .status(400)
+        .json({ error: 'Standardkontoen må være en av de registrerte bankkontoene.' });
+    }
+    update.defaultFixedExpensesBankAccount = trimmed;
+  }
+
+  if (bankModeEnabled === false) {
+    update.defaultFixedExpensesBankAccount = '';
   }
 
   if (lockPassword !== undefined) {
