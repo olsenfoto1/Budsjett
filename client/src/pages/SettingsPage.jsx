@@ -108,10 +108,6 @@ const SettingsPage = () => {
     };
   }, []);
 
-  useEffect(() => {
-    syncOwnerBankContributions(bankAccountsDraft);
-  }, [bankAccountsDraft, syncOwnerBankContributions]);
-
   const ownerNames = useMemo(() => {
     const names = new Set();
     ownersFromExpenses.forEach((name) => {
@@ -143,6 +139,10 @@ const SettingsPage = () => {
     });
   }, []);
 
+  useEffect(() => {
+    syncOwnerBankContributions(bankAccountsDraft);
+  }, [bankAccountsDraft, syncOwnerBankContributions]);
+
   const syncOwnersFromPayload = (payload = {}) => {
     if (Array.isArray(payload.ownerProfiles)) {
       const refreshed = {};
@@ -150,7 +150,8 @@ const SettingsPage = () => {
         if (profile?.name) {
           refreshed[profile.name] = {
             income: String(profile.monthlyNetIncome ?? ''),
-            shared: String(profile.sharedContribution ?? '')
+            shared: String(profile.sharedContribution ?? ''),
+            bankContributions: profile.bankContributions || {}
           };
         }
       });
