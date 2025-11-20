@@ -292,6 +292,11 @@ main {
   align-items: center;
 }
 
+.settings-actions input[type='file'] {
+  flex: 0 0 auto;
+  max-width: 240px;
+}
+
 .export-preview {
   white-space: pre-wrap;
   background: rgba(15, 23, 42, 0.04);
