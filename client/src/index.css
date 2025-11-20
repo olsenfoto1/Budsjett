@@ -1903,35 +1903,56 @@ select:focus {
 .bank-mode-card {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 0.75rem;
 }
 
 .bank-mode-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(260px, 0.8fr);
   gap: 1rem;
+  align-items: stretch;
+  background: var(--surface-soft);
+  border: 1px solid var(--border-color);
+  border-radius: 1.1rem;
+  padding: 1rem;
+}
+
+.bank-mode-meta {
+  display: flex;
   flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.35rem;
+}
+
+.muted-pill {
+  background: rgba(148, 163, 184, 0.18);
+  color: var(--text-secondary);
+  border-radius: 999px;
+  padding: 0.25rem 0.75rem;
+  font-weight: 600;
+  border: 1px solid var(--border-color);
 }
 
 .bank-mode-totals {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 0.75rem;
-  align-items: center;
+  align-items: stretch;
+  padding: 0.25rem;
 }
 
 .bank-mode-total-tile {
-  padding: 0.75rem 0.9rem;
-  border-radius: 0.9rem;
-  background: var(--surface-soft);
-  border: 1px solid var(--border-color);
+  padding: 0.65rem 0.8rem;
+  border-radius: 0.85rem;
+  background: linear-gradient(140deg, var(--surface), var(--surface-soft));
+  border: 1px solid var(--border-subtle);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
 }
 
 .bank-owner-list {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.6rem;
 }
 
 .bank-owner-row {
@@ -1939,12 +1960,10 @@ select:focus {
   grid-template-columns: auto 1fr repeat(2, minmax(120px, 180px));
   gap: 0.75rem;
   align-items: center;
-  padding: 0.75rem 0;
-  border-top: 1px solid var(--border-color);
-}
-
-.bank-owner-row:first-of-type {
-  border-top: none;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.9rem;
+  background: var(--surface);
 }
 
 .bank-owner-amounts {
@@ -1952,6 +1971,18 @@ select:focus {
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 0.5rem;
   align-items: center;
+}
+
+@media (max-width: 900px) {
+  .bank-mode-header {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .bank-owner-row {
+    grid-template-columns: auto 1fr;
+  }
 }
 
 .bank-account-list {

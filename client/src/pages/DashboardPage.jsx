@@ -291,6 +291,10 @@ const DashboardPage = () => {
               <p className="eyebrow">Bank-modus</p>
               <h3>Felles regningskonto</h3>
               <p className="muted">Bidragene under styrer felleskontoen som dekker faste kostnader.</p>
+              <div className="bank-mode-meta">
+                <span className="pill muted-pill">Faste kostnader: {formatCurrency(summary.fixedExpenseTotal)}</span>
+                <span className="pill muted-pill">{bankModeOwners.length || 'Ingen'} bidragsytere</span>
+              </div>
             </div>
             <div className="bank-mode-totals">
               <div className="bank-mode-total-tile">
