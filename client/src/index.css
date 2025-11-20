@@ -863,6 +863,9 @@ select:focus {
   border: none;
   cursor: pointer;
   font: inherit;
+  background: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 .chip-button:focus-visible {
@@ -879,6 +882,18 @@ select:focus {
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem;
+}
+
+@media (max-width: 640px) {
+  .chip {
+    padding: 0.35rem 0.85rem;
+    min-height: 36px;
+    align-items: center;
+  }
+
+  .chip-button {
+    min-width: 44px;
+  }
 }
 
 .owner-filter-panel {
