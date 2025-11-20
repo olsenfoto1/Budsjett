@@ -7,6 +7,7 @@ import CategoriesPage from './pages/CategoriesPage.jsx';
 import PagesPage from './pages/PagesPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
 import FixedExpensesPage from './pages/FixedExpensesPage.jsx';
+import ExpenseSearch from './components/ExpenseSearch.jsx';
 
 const getInitialTheme = () => {
   if (typeof window === 'undefined') return 'light';
@@ -174,6 +175,7 @@ const App = () => {
             <NavLink to="/categories">Kategorier</NavLink>
             <NavLink to="/innstillinger">Innstillinger</NavLink>
           </div>
+          <ExpenseSearch />
           <button type="button" className="theme-toggle" onClick={toggleTheme}>
             {theme === 'light' ? '🌙 Mørk modus' : '☀️ Lys modus'}
           </button>
