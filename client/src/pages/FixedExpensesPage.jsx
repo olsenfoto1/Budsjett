@@ -1001,14 +1001,6 @@ const FixedExpensesPage = () => {
                               <strong>{formatCurrency(expense.amountPerMonth)}</strong>
                             </div>
                           </div>
-                          <button
-                            type="button"
-                            className={`icon-button price-toggle${isPriceSectionOpen ? ' active' : ''}`}
-                            aria-expanded={isPriceSectionOpen}
-                            onClick={() => handleTogglePriceSection(expense.id)}
-                          >
-                            {isPriceSectionOpen ? 'Pris & historikk' : 'Ny pris'}
-                          </button>
                         </div>
                         {isPriceSectionOpen && (
                           <div className="price-adjustment">
@@ -1054,6 +1046,14 @@ const FixedExpensesPage = () => {
                           </div>
                         )}
                         <div className="expense-actions">
+                          <button
+                            type="button"
+                            className={`icon-button price-toggle${isPriceSectionOpen ? ' active' : ''}`}
+                            aria-expanded={isPriceSectionOpen}
+                            onClick={() => handleTogglePriceSection(expense.id)}
+                          >
+                            {isPriceSectionOpen ? 'Pris & historikk' : 'Ny pris'}
+                          </button>
                           <button className="secondary" onClick={() => setSimulatedExpense(expense)}>
                             Simuler oppsigelse
                           </button>
