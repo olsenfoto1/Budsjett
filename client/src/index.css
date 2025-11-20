@@ -1620,7 +1620,7 @@ select:focus {
 
 .owner-income-tile {
   display: grid;
-  grid-template-columns: auto 1fr minmax(160px, 200px);
+  grid-template-columns: auto 1fr minmax(160px, 200px) minmax(140px, 160px);
   gap: 0.75rem;
   align-items: center;
   padding: 0.85rem 1rem;
@@ -1683,10 +1683,39 @@ select:focus {
   font-weight: 700;
 }
 
+.owner-income-hint {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
 .owner-income-input {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
+}
+
+.owner-action-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  align-items: flex-end;
+}
+
+.owner-action-buttons .ghost,
+.ghost {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  box-shadow: none;
+}
+
+.owner-action-buttons .ghost.danger-text {
+  border-color: rgba(220, 38, 38, 0.3);
+  color: #dc2626;
+}
+
+.owner-action-buttons button {
+  width: 100%;
 }
 
 .currency-input {
@@ -1824,6 +1853,16 @@ select:focus {
   border: 1px dashed var(--border-color);
   border-radius: 1rem;
   background: var(--surface-soft);
+}
+
+@media (max-width: 900px) {
+  .owner-income-tile {
+    grid-template-columns: 1fr;
+  }
+
+  .owner-action-buttons {
+    align-items: stretch;
+  }
 }
 
 @media (max-width: 640px) {

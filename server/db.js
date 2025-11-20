@@ -31,6 +31,16 @@ const defaultData = {
   }
 };
 
+const uniqueOwnerList = (owners = []) =>
+  Array.from(
+    new Set(
+      owners
+        .filter((owner) => typeof owner === 'string')
+        .map((owner) => owner.trim())
+        .filter(Boolean)
+    )
+  );
+
 class Store {
   constructor() {
     this.state = this.load();
@@ -524,6 +534,141 @@ class Store {
     this.state.settings = next;
     this.save();
     return this.state.settings;
+  }
+
+  renameOwner(fromName, toName) {
+    const from = typeof fromName === 'string' ? fromName.trim() : '';
+    const to = typeof toName === 'string' ? toName.trim() : '';
+
+    if (!from || !to || from === to) {
+      return {
+        changed: false,
+        ownerProfiles: this.state.settings.ownerProfiles,
+        defaultFixedExpensesOwners: this.state.settings.defaultFixedExpensesOwners,
+        fixedExpenses: this.state.fixedExpenses
+      };
+    }
+
+    let changed = false;
+    const now = new Date().toISOString();
+
+    this.state.fixedExpenses = this.state.fixedExpenses.map((expense) => {
+      const owners = Array.isArray(expense.owners)
+        ? expense.owners.map((owner) => owner.trim()).filter(Boolean)
+        : [];
+      if (!owners.includes(from)) return expense;
+
+      const updatedOwners = uniqueOwnerList(owners.map((owner) => (owner === from ? to : owner)));
+      const ownersChanged = updatedOwners.join('|') !== owners.join('|');
+
+      if (ownersChanged) {
+        changed = true;
+        return { ...expense, owners: updatedOwners, updatedAt: now };
+      }
+      return expense;
+    });
+
+    const ownerProfiles = Array.isArray(this.state.settings.ownerProfiles)
+      ? this.state.settings.ownerProfiles
+      : [];
+    const renamedProfilesMap = new Map();
+    ownerProfiles.forEach((profile) => {
+      if (!profile || typeof profile.name !== 'string') return;
+      const name = profile.name === from ? to : profile.name;
+      if (!name) return;
+      const income = Number(profile.monthlyNetIncome) || 0;
+      if (!renamedProfilesMap.has(name)) {
+        renamedProfilesMap.set(name, income);
+      }
+    });
+    const nextProfiles = Array.from(renamedProfilesMap.entries()).map(([name, monthlyNetIncome]) => ({
+      name,
+      monthlyNetIncome
+    }));
+    if (JSON.stringify(nextProfiles) !== JSON.stringify(ownerProfiles)) {
+      changed = true;
+      this.state.settings.ownerProfiles = nextProfiles;
+    }
+
+    const defaults = uniqueOwnerList(this.state.settings.defaultFixedExpensesOwners || []);
+    const renamedDefaults = uniqueOwnerList(defaults.map((owner) => (owner === from ? to : owner)));
+    if (renamedDefaults.join('|') !== defaults.join('|')) {
+      changed = true;
+      this.state.settings.defaultFixedExpensesOwners = renamedDefaults;
+      this.state.settings.defaultFixedExpensesOwner = renamedDefaults[0] || '';
+    }
+
+    if (changed) {
+      this.save();
+    }
+
+    return {
+      changed,
+      ownerProfiles: this.state.settings.ownerProfiles,
+      defaultFixedExpensesOwners: this.state.settings.defaultFixedExpensesOwners,
+      fixedExpenses: this.state.fixedExpenses
+    };
+  }
+
+  deleteOwner(name) {
+    const target = typeof name === 'string' ? name.trim() : '';
+
+    if (!target) {
+      return {
+        changed: false,
+        ownerProfiles: this.state.settings.ownerProfiles,
+        defaultFixedExpensesOwners: this.state.settings.defaultFixedExpensesOwners,
+        fixedExpenses: this.state.fixedExpenses
+      };
+    }
+
+    let changed = false;
+    const now = new Date().toISOString();
+
+    this.state.fixedExpenses = this.state.fixedExpenses.map((expense) => {
+      const owners = Array.isArray(expense.owners)
+        ? expense.owners.map((owner) => owner.trim()).filter(Boolean)
+        : [];
+      const filtered = owners.filter((owner) => owner !== target);
+      if (filtered.length !== owners.length) {
+        changed = true;
+        return { ...expense, owners: filtered, updatedAt: now };
+      }
+      return expense;
+    });
+
+    const beforeProfiles = Array.isArray(this.state.settings.ownerProfiles)
+      ? this.state.settings.ownerProfiles.length
+      : 0;
+    this.state.settings.ownerProfiles = (this.state.settings.ownerProfiles || []).filter(
+      (profile) => profile?.name !== target
+    );
+    if ((this.state.settings.ownerProfiles?.length || 0) !== beforeProfiles) {
+      changed = true;
+    }
+
+    const defaultsBefore = Array.isArray(this.state.settings.defaultFixedExpensesOwners)
+      ? this.state.settings.defaultFixedExpensesOwners.length
+      : 0;
+    this.state.settings.defaultFixedExpensesOwners = uniqueOwnerList(
+      (this.state.settings.defaultFixedExpensesOwners || []).filter((owner) => owner !== target)
+    );
+    if (this.state.settings.defaultFixedExpensesOwners.length !== defaultsBefore) {
+      changed = true;
+      this.state.settings.defaultFixedExpensesOwner =
+        this.state.settings.defaultFixedExpensesOwners[0] || '';
+    }
+
+    if (changed) {
+      this.save();
+    }
+
+    return {
+      changed,
+      ownerProfiles: this.state.settings.ownerProfiles,
+      defaultFixedExpensesOwners: this.state.settings.defaultFixedExpensesOwners,
+      fixedExpenses: this.state.fixedExpenses
+    };
   }
 
   replaceAll(data) {

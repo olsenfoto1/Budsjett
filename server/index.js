@@ -120,6 +120,8 @@ const normalizeOwnersInput = (owners) => {
   return [];
 };
 
+const normalizeName = (value) => (typeof value === 'string' ? value.trim() : '');
+
 app.get('/api/lock/status', (req, res) => {
   const enabled = isLockEnabled();
   const unlocked = !enabled || isValidLockToken(readLockToken(req));
@@ -650,6 +652,39 @@ app.get('/api/dashboard', (req, res) => {
     bindingExpirations,
     fixedExpensesCount: fixedExpenses.length
   });
+});
+
+app.post('/api/owners/rename', (req, res) => {
+  const from = normalizeName(req.body.from ?? req.body.oldName);
+  const to = normalizeName(req.body.to ?? req.body.newName);
+
+  if (!from || !to) {
+    return res.status(400).json({ error: 'Både gammelt og nytt navn må fylles ut.' });
+  }
+  if (from === to) {
+    return res.status(400).json({ error: 'Navnet er uendret.' });
+  }
+
+  const result = db.renameOwner(from, to);
+  if (!result.changed) {
+    return res.status(404).json({ error: 'Fant ikke personen du ville oppdatere.' });
+  }
+
+  res.json(result);
+});
+
+app.post('/api/owners/delete', (req, res) => {
+  const name = normalizeName(req.body.name ?? req.body.owner);
+  if (!name) {
+    return res.status(400).json({ error: 'Navn må fylles ut for å fjerne en person.' });
+  }
+
+  const result = db.deleteOwner(name);
+  if (!result.changed) {
+    return res.status(404).json({ error: 'Fant ingen person med dette navnet.' });
+  }
+
+  res.json(result);
 });
 
 app.get('/api/export', (req, res) => {

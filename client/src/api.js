@@ -44,6 +44,8 @@ export const api = {
 
   getSettings: () => request('/settings'),
   updateSettings: (payload) => request('/settings', { method: 'PUT', body: JSON.stringify(payload) }),
+  renameOwner: (from, to) => request('/owners/rename', { method: 'POST', body: JSON.stringify({ from, to }) }),
+  deleteOwner: (name) => request('/owners/delete', { method: 'POST', body: JSON.stringify({ name }) }),
 
   getLockStatus: () => request('/lock/status'),
   unlock: (password) => request('/lock/unlock', { method: 'POST', body: JSON.stringify({ password }) }),

@@ -16,6 +16,9 @@ const SettingsPage = () => {
   const [defaultOwnerStatus, setDefaultOwnerStatus] = useState('');
   const [defaultOwnerError, setDefaultOwnerError] = useState('');
   const [isUpdatingDefaultOwner, setIsUpdatingDefaultOwner] = useState(false);
+  const [editingOwner, setEditingOwner] = useState('');
+  const [editedOwnerName, setEditedOwnerName] = useState('');
+  const [ownerActionLoading, setOwnerActionLoading] = useState('');
   const [lockEnabled, setLockEnabled] = useState(false);
   const [lockStatus, setLockStatus] = useState('');
   const [lockError, setLockError] = useState('');
@@ -101,6 +104,33 @@ const SettingsPage = () => {
     return Array.from(names).sort((a, b) => a.localeCompare(b, 'no'));
   }, [ownersFromExpenses, ownerInputs, defaultOwners]);
 
+  const syncOwnersFromPayload = (payload = {}) => {
+    if (Array.isArray(payload.ownerProfiles)) {
+      const refreshed = {};
+      payload.ownerProfiles.forEach((profile) => {
+        if (profile?.name) {
+          refreshed[profile.name] = String(profile.monthlyNetIncome ?? '');
+        }
+      });
+      setOwnerInputs(refreshed);
+    }
+
+    if (Array.isArray(payload.defaultFixedExpensesOwners)) {
+      setDefaultOwners(payload.defaultFixedExpensesOwners);
+    }
+
+    if (Array.isArray(payload.fixedExpenses)) {
+      const owners = Array.from(
+        new Set(
+          payload.fixedExpenses
+            .flatMap((expense) => (Array.isArray(expense.owners) ? expense.owners : []))
+            .filter(Boolean)
+        )
+      ).sort((a, b) => a.localeCompare(b, 'no'));
+      setOwnersFromExpenses(owners);
+    }
+  };
+
   const handleOwnerIncomeChange = (name, value) => {
     setOwnerInputs((current) => ({ ...current, [name]: value }));
   };
@@ -140,18 +170,76 @@ const SettingsPage = () => {
           return { name: trimmedName, monthlyNetIncome: numericValue };
         });
       const updated = await api.updateSettings({ ownerProfiles: payload });
-      const refreshed = {};
-      (updated.ownerProfiles || []).forEach((profile) => {
-        if (profile?.name) {
-          refreshed[profile.name] = String(profile.monthlyNetIncome ?? '');
-        }
-      });
-      setOwnerInputs(refreshed);
+      syncOwnersFromPayload(updated);
       setOwnerStatus('Lagret personlige inntekter.');
     } catch (err) {
       setOwnerError(err.message || 'Kunne ikke lagre inntekter.');
     } finally {
       setIsSavingOwners(false);
+    }
+  };
+
+  const handleStartRenameOwner = (name) => {
+    setOwnerStatus('');
+    setOwnerError('');
+    setEditingOwner(name);
+    setEditedOwnerName(name);
+  };
+
+  const handleConfirmRenameOwner = async () => {
+    setOwnerStatus('');
+    setOwnerError('');
+    const trimmed = editedOwnerName.trim();
+
+    if (!editingOwner) return;
+    if (!trimmed) {
+      setOwnerError('Skriv inn et nytt navn.');
+      return;
+    }
+    if (trimmed === editingOwner) {
+      setOwnerError('Navnet er uendret.');
+      return;
+    }
+    const nameExists = ownerNames.some(
+      (owner) => owner !== editingOwner && owner.toLowerCase() === trimmed.toLowerCase()
+    );
+    if (nameExists) {
+      setOwnerError('Det finnes allerede en person med dette navnet.');
+      return;
+    }
+
+    setOwnerActionLoading(editingOwner);
+    try {
+      const result = await api.renameOwner(editingOwner, trimmed);
+      syncOwnersFromPayload(result);
+      setOwnerStatus(`Navn endret til ${trimmed}.`);
+      setEditingOwner('');
+      setEditedOwnerName('');
+    } catch (err) {
+      setOwnerError(err.message || 'Kunne ikke endre navn.');
+    } finally {
+      setOwnerActionLoading('');
+    }
+  };
+
+  const handleDeleteOwner = async (name) => {
+    setOwnerStatus('');
+    setOwnerError('');
+    if (!window.confirm(`Fjerne ${name}? Dette oppdaterer også faste utgifter.`)) return;
+
+    setOwnerActionLoading(name);
+    try {
+      const result = await api.deleteOwner(name);
+      syncOwnersFromPayload(result);
+      setOwnerStatus(`${name} er fjernet.`);
+      if (editingOwner === name) {
+        setEditingOwner('');
+        setEditedOwnerName('');
+      }
+    } catch (err) {
+      setOwnerError(err.message || 'Kunne ikke fjerne personen.');
+    } finally {
+      setOwnerActionLoading('');
     }
   };
 
@@ -486,33 +574,92 @@ const SettingsPage = () => {
                   <span className="stat-chip">{ownerNames.length} personer</span>
                 </div>
                 <div className="owner-income-tiles">
-                  {ownerNames.map((name) => (
-                    <div key={name} className="owner-income-tile">
-                      <div className="owner-avatar" aria-hidden>
-                        {name.charAt(0).toUpperCase()}
-                      </div>
-                      <div className="owner-income-meta">
-                        <p className="owner-name">{name}</p>
-                        <p className="muted">Beløp per måned</p>
-                      </div>
-                      <div className="owner-income-input">
-                        <label className="muted" htmlFor={`owner-income-${name}`}>
-                          Netto
-                        </label>
-                        <div className="currency-input">
-                          <span className="currency-prefix">kr</span>
-                          <input
-                            id={`owner-income-${name}`}
-                            type="number"
-                            min="0"
-                            placeholder="0"
-                            value={ownerInputs[name] ?? ''}
-                            onChange={(e) => handleOwnerIncomeChange(name, e.target.value)}
-                          />
+                  {ownerNames.map((name) => {
+                    const isEditing = editingOwner === name;
+                    return (
+                      <div key={name} className="owner-income-tile">
+                        <div className="owner-avatar" aria-hidden>
+                          {name.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="owner-income-meta">
+                          <label className="muted" htmlFor={`owner-name-${name}`}>
+                            Navn
+                          </label>
+                          {isEditing ? (
+                            <input
+                              id={`owner-name-${name}`}
+                              value={editedOwnerName}
+                              onChange={(e) => setEditedOwnerName(e.target.value)}
+                              placeholder="Nytt navn"
+                            />
+                          ) : (
+                            <p className="owner-name">{name}</p>
+                          )}
+                          <p className="muted owner-income-hint">Beløp og navn brukes på hele siden.</p>
+                        </div>
+                        <div className="owner-income-input">
+                          <label className="muted" htmlFor={`owner-income-${name}`}>
+                            Netto
+                          </label>
+                          <div className="currency-input">
+                            <span className="currency-prefix">kr</span>
+                            <input
+                              id={`owner-income-${name}`}
+                              type="number"
+                              min="0"
+                              placeholder="0"
+                              value={ownerInputs[name] ?? ''}
+                              onChange={(e) => handleOwnerIncomeChange(name, e.target.value)}
+                            />
+                          </div>
+                        </div>
+                        <div className="owner-action-buttons">
+                          {isEditing ? (
+                            <>
+                              <button
+                                type="button"
+                                className="secondary"
+                                onClick={handleConfirmRenameOwner}
+                                disabled={ownerActionLoading === name}
+                              >
+                                Lagre navn
+                              </button>
+                              <button
+                                type="button"
+                                className="ghost"
+                                onClick={() => {
+                                  setEditingOwner('');
+                                  setEditedOwnerName('');
+                                }}
+                                disabled={ownerActionLoading === name}
+                              >
+                                Avbryt
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                className="ghost"
+                                onClick={() => handleStartRenameOwner(name)}
+                                disabled={Boolean(ownerActionLoading)}
+                              >
+                                Endre navn
+                              </button>
+                              <button
+                                type="button"
+                                className="ghost danger-text"
+                                onClick={() => handleDeleteOwner(name)}
+                                disabled={ownerActionLoading === name}
+                              >
+                                Fjern
+                              </button>
+                            </>
+                          )}
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
