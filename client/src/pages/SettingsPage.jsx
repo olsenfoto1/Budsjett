@@ -275,7 +275,11 @@ const SettingsPage = () => {
             income !== '' && income !== null && income !== undefined && String(income).trim() !== '';
           const hasShared =
             shared !== '' && shared !== null && shared !== undefined && String(shared).trim() !== '';
-          return hasIncome || hasShared;
+          const hasBankContribution = bankAccounts.some((account) => {
+            const rawValue = value?.bankContributions?.[account];
+            return rawValue !== '' && rawValue !== null && rawValue !== undefined && String(rawValue).trim() !== '';
+          });
+          return hasIncome || hasShared || hasBankContribution;
         })
         .map(([name, value]) => {
           const trimmedName = name.trim();
@@ -872,7 +876,7 @@ const SettingsPage = () => {
                             />
                           </div>
                         </div>
-                        {bankModeEnabled && (
+                        {bankModeEnabled && bankAccountsDraft.length === 0 && (
                           <div className="owner-income-input">
                             <label className="muted" htmlFor={`owner-shared-${name}`}>
                               Til felleskonto
