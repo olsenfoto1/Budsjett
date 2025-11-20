@@ -283,6 +283,36 @@ main {
   flex-direction: column;
   gap: 0.65rem;
   min-height: 100%;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  z-index: 0;
+}
+
+:root[data-theme='dark'] .settings-tile {
+  border-color: rgba(148, 163, 184, 0.35);
+}
+
+:root[data-theme='dark'] .settings-tile::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: linear-gradient(145deg, rgba(185, 198, 255, 0.18), rgba(14, 165, 233, 0.08));
+  z-index: -1;
+  opacity: 0.9;
+}
+
+:root[data-theme='dark'] .settings-subgrid .settings-tile:nth-child(3n + 1)::before {
+  background: linear-gradient(140deg, rgba(99, 102, 241, 0.26), rgba(14, 165, 233, 0.14));
+}
+
+:root[data-theme='dark'] .settings-subgrid .settings-tile:nth-child(3n + 2)::before {
+  background: linear-gradient(150deg, rgba(16, 185, 129, 0.2), rgba(52, 211, 153, 0.12));
+}
+
+:root[data-theme='dark'] .settings-subgrid .settings-tile:nth-child(3n + 3)::before {
+  background: linear-gradient(160deg, rgba(244, 114, 182, 0.22), rgba(251, 146, 60, 0.12));
 }
 
 .settings-actions {
