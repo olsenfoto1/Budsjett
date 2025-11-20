@@ -181,7 +181,15 @@ const SettingsPage = () => {
     try {
       const payload = Object.entries(ownerInputs)
         .filter(([name]) => name.trim())
-        .filter(([, value]) => value !== '' && value !== null && value !== undefined)
+        .filter(([, value]) => {
+          const income = value?.income;
+          const shared = value?.shared;
+          const hasIncome =
+            income !== '' && income !== null && income !== undefined && String(income).trim() !== '';
+          const hasShared =
+            shared !== '' && shared !== null && shared !== undefined && String(shared).trim() !== '';
+          return hasIncome || hasShared;
+        })
         .map(([name, value]) => {
           const trimmedName = name.trim();
           const numericIncome = Number(value?.income ?? value);
