@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, PointElement, LineElement, BarElement } from 'chart.js';
 import { Line, Doughnut, Bar } from 'react-chartjs-2';
 import { api } from '../api.js';
-import { formatCurrency } from '../utils/format.js';
+import { formatCurrency, formatDate } from '../utils/format.js';
 import { loadSavingsGoals, summarizeSavingsGoals } from '../utils/savings.js';
 
 ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, PointElement, LineElement, BarElement);
@@ -25,6 +25,11 @@ const DashboardPage = () => {
   const [error, setError] = useState('');
   const [savingsStats, setSavingsStats] = useState(() => summarizeSavingsGoals(loadSavingsGoals()));
   const [hiddenCategories, setHiddenCategories] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState('');
 
   const fetchSummary = async () => {
     try {
@@ -63,6 +68,27 @@ const DashboardPage = () => {
       current.filter((category) => fixedCategories.some((item) => item.category === category))
     );
   }, [fixedCategories]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm.trim()), 350);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    if (!debouncedSearch) {
+      setSearchResults([]);
+      setSearchError('');
+      return;
+    }
+
+    setSearchLoading(true);
+    setSearchError('');
+    api
+      .getTransactions({ search: debouncedSearch, type: 'expense', sortBy: 'occurredOn', order: 'DESC' })
+      .then((data) => setSearchResults(Array.isArray(data) ? data.slice(0, 8) : []))
+      .catch((err) => setSearchError(err.message || 'Kunne ikke søke etter utgifter.'))
+      .finally(() => setSearchLoading(false));
+  }, [debouncedSearch]);
 
   const visibleFixedCategories = useMemo(
     () => fixedCategories.filter((item) => !hiddenCategories.includes(item.category)),
@@ -275,6 +301,57 @@ const DashboardPage = () => {
               </span>
             </div>
           )}
+        </div>
+      </div>
+
+      <div className="card insight-card glow-search transaction-search-card">
+        <div className="transaction-search-header">
+          <div>
+            <h3>Finn en utgift lynraskt</h3>
+            <p className="muted">Skriv for å få forslag på tvers av alle utgifter, med kategori, dato og side.</p>
+          </div>
+          {debouncedSearch && !searchLoading && <span className="badge">{searchResults.length} forslag</span>}
+        </div>
+        <div className="search-input-row">
+          <span className="search-icon" aria-hidden="true">
+            🔎
+          </span>
+          <input
+            className="search-input"
+            type="search"
+            placeholder="For eksempel: strøm, barnehage, forsikring…"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+          {searchTerm && (
+            <button type="button" className="ghost-button" onClick={() => setSearchTerm('')}>
+              Nullstill
+            </button>
+          )}
+        </div>
+        {searchError && <p className="error-text">{searchError}</p>}
+        <div className="suggestion-list" role="list" aria-live="polite">
+          {!debouncedSearch && <p className="muted">Start å skrive for å se de mest relevante utgiftene dine.</p>}
+          {debouncedSearch && searchLoading && <p className="muted">Søker etter utgifter…</p>}
+          {debouncedSearch && !searchLoading && searchResults.length === 0 && (
+            <p className="muted">Fant ingen utgifter som matcher «{debouncedSearch}».</p>
+          )}
+          {searchResults.map((tx) => (
+            <article key={tx.id} className="suggestion-item" role="listitem">
+              <div>
+                <div className="suggestion-title">{tx.title}</div>
+                <div className="suggestion-meta">
+                  <span className="badge soft">{tx.categoryName || 'Ingen kategori'}</span>
+                  {tx.pageName && <span className="pill">{tx.pageName}</span>}
+                  <span className="pill">{formatDate(tx.occurredOn)}</span>
+                </div>
+                {tx.notes && <p className="muted">{tx.notes}</p>}
+              </div>
+              <div className="suggestion-amount" aria-label="Beløp">
+                {formatCurrency(tx.amount)}
+              </div>
+            </article>
+          ))}
         </div>
       </div>
 
