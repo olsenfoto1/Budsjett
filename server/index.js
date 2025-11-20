@@ -236,6 +236,15 @@ app.get('/api/transactions', (req, res) => {
   res.json(transactions.map(enrichTransaction));
 });
 
+app.get('/api/transactions/:id', (req, res) => {
+  const { id } = req.params;
+  const transaction = db.getTransactions().find((tx) => String(tx.id) === String(id));
+  if (!transaction) {
+    return res.status(404).json({ error: 'Transaksjon ikke funnet' });
+  }
+  res.json(enrichTransaction(transaction));
+});
+
 app.post('/api/transactions', (req, res) => {
   const {
     title,

@@ -20,6 +20,7 @@ export const api = {
     const query = new URLSearchParams(params).toString();
     return request(`/transactions${query ? `?${query}` : ''}`);
   },
+  getTransactionById: (id) => request(`/transactions/${id}`),
   createTransaction: (payload) => request('/transactions', { method: 'POST', body: JSON.stringify(payload) }),
   updateTransaction: (id, payload) =>
     request(`/transactions/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
