@@ -12,6 +12,7 @@ const DEFAULT_SETTINGS = {
   ownerProfiles: [],
   defaultFixedExpensesOwner: '',
   defaultFixedExpensesOwners: [],
+  bankAccounts: [],
   bankModeEnabled: false,
   lockEnabled: false,
   lockSalt: '',
@@ -82,6 +83,9 @@ class Store {
       if (!Array.isArray(this.state.settings.defaultFixedExpensesOwners)) {
         this.state.settings.defaultFixedExpensesOwners = [];
       }
+      if (!Array.isArray(this.state.settings.bankAccounts)) {
+        this.state.settings.bankAccounts = [];
+      }
       this.state.settings.defaultFixedExpensesOwners = this.normalizeDefaultOwnerList(
         this.state.settings.defaultFixedExpensesOwners
       );
@@ -98,6 +102,10 @@ class Store {
       }
       this.state.settings.defaultFixedExpensesOwner =
         this.state.settings.defaultFixedExpensesOwners[0] || '';
+
+      this.state.settings.bankAccounts = this.normalizeBankAccounts(
+        this.state.settings.bankAccounts || []
+      );
 
       if (typeof this.state.settings.lockEnabled !== 'boolean') {
         this.state.settings.lockEnabled = false;
@@ -175,6 +183,7 @@ class Store {
       amountPerMonth: amount,
       category: raw.category || raw.kategori || 'Annet',
       owners: toOwners(raw.owners || raw.eier || raw.eiere),
+      account: typeof raw.account === 'string' ? raw.account.trim() : '',
       level: raw.level || raw.nivå || 'Må-ha',
       startDate: raw.startDate || raw.startdato || '',
       bindingEndDate: raw.bindingEndDate || raw.binding_utløper || raw.sluttdato || '',
@@ -198,7 +207,26 @@ class Store {
       const income = Number.isFinite(incomeValue) && incomeValue >= 0 ? incomeValue : 0;
       const sharedValue = Number(profile.sharedContribution ?? profile.sharedContributionPerMonth);
       const sharedContribution = Number.isFinite(sharedValue) && sharedValue >= 0 ? sharedValue : 0;
-      map.set(name, { monthlyNetIncome: income, sharedContribution });
+      const bankContributions = {};
+      if (profile && typeof profile.bankContributions === 'object') {
+        Object.entries(profile.bankContributions).forEach(([account, value]) => {
+          if (typeof account !== 'string') return;
+          const trimmed = account.trim();
+          const numeric = Number(value);
+          if (!trimmed || !Number.isFinite(numeric) || numeric < 0) return;
+          bankContributions[trimmed] = numeric;
+        });
+      }
+      const totalBankContribution = Object.values(bankContributions).reduce(
+        (sum, value) => sum + (Number.isFinite(value) ? Number(value) : 0),
+        0
+      );
+      const effectiveShared = totalBankContribution > 0 ? totalBankContribution : sharedContribution;
+      map.set(name, {
+        monthlyNetIncome: income,
+        sharedContribution: effectiveShared,
+        bankContributions
+      });
     });
     return Array.from(map.entries()).map(([name, values]) => ({ name, ...values }));
   }
@@ -211,6 +239,20 @@ class Store {
       const trimmed = item.trim();
       if (trimmed) {
         seen.add(trimmed);
+      }
+    });
+    return Array.from(seen);
+  }
+
+  normalizeBankAccounts(value) {
+    if (!Array.isArray(value)) return [];
+    const seen = new Set();
+    value.forEach((item) => {
+      if (typeof item === 'string') {
+        const trimmed = item.trim();
+        if (trimmed) {
+          seen.add(trimmed);
+        }
       }
     });
     return Array.from(seen);
@@ -394,6 +436,7 @@ class Store {
       owners: Array.isArray(payload.owners)
         ? payload.owners.map((owner) => owner.trim()).filter(Boolean)
         : [],
+      account: typeof payload.account === 'string' ? payload.account.trim() : '',
       level: payload.level || 'Må-ha',
       startDate: payload.startDate || '',
       bindingEndDate: payload.bindingEndDate || '',
@@ -455,6 +498,12 @@ class Store {
         : Array.isArray(payload.owners)
         ? payload.owners.map((owner) => owner.trim()).filter(Boolean)
         : [];
+    const account =
+      payload.account === undefined
+        ? current.account || ''
+        : typeof payload.account === 'string'
+        ? payload.account.trim()
+        : '';
     const nextAmount =
       payload.amountPerMonth !== undefined
         ? Number(payload.amountPerMonth) || 0
@@ -474,6 +523,7 @@ class Store {
       ...current,
       ...payload,
       owners,
+      account,
       amountPerMonth: nextAmount,
       noticePeriodMonths:
         payload.noticePeriodMonths === undefined
@@ -527,6 +577,9 @@ class Store {
     if (!Array.isArray(this.state.settings.defaultFixedExpensesOwners)) {
       this.state.settings.defaultFixedExpensesOwners = [];
     }
+    if (!Array.isArray(this.state.settings.bankAccounts)) {
+      this.state.settings.bankAccounts = [];
+    }
     this.state.settings.defaultFixedExpensesOwners = this.normalizeDefaultOwnerList(
       this.state.settings.defaultFixedExpensesOwners
     );
@@ -546,6 +599,9 @@ class Store {
     }
     this.state.settings.defaultFixedExpensesOwner =
       this.state.settings.defaultFixedExpensesOwners[0] || '';
+    this.state.settings.bankAccounts = this.normalizeBankAccounts(
+      this.state.settings.bankAccounts
+    );
     return this.state.settings;
   }
 
@@ -559,6 +615,12 @@ class Store {
 
     if (payload.bankModeEnabled !== undefined) {
       next.bankModeEnabled = Boolean(payload.bankModeEnabled);
+    }
+
+    if (payload.bankAccounts !== undefined) {
+      next.bankAccounts = this.normalizeBankAccounts(payload.bankAccounts);
+    } else if (!Array.isArray(next.bankAccounts)) {
+      next.bankAccounts = [];
     }
 
     if (payload.ownerProfiles !== undefined) {
@@ -584,6 +646,37 @@ class Store {
     }
 
     next.defaultFixedExpensesOwner = next.defaultFixedExpensesOwners[0] || '';
+
+    next.bankAccounts = this.normalizeBankAccounts(next.bankAccounts);
+
+    const validAccounts = new Set(next.bankAccounts);
+
+    if (Array.isArray(next.ownerProfiles)) {
+      next.ownerProfiles = next.ownerProfiles.map((profile) => {
+        const contributions = {};
+        Object.entries(profile.bankContributions || {}).forEach(([account, value]) => {
+          if (!validAccounts.has(account)) return;
+          contributions[account] = value;
+        });
+        const totalContribution = Object.values(contributions).reduce(
+          (sum, value) => sum + (Number.isFinite(value) ? Number(value) : 0),
+          0
+        );
+        return {
+          ...profile,
+          bankContributions: contributions,
+          sharedContribution: totalContribution > 0 ? totalContribution : profile.sharedContribution
+        };
+      });
+    }
+
+    const now = new Date().toISOString();
+    this.state.fixedExpenses = this.state.fixedExpenses.map((expense) => {
+      if (expense.account && !validAccounts.has(expense.account)) {
+        return { ...expense, account: '', updatedAt: now };
+      }
+      return expense;
+    });
 
     if (payload.lockEnabled !== undefined) {
       next.lockEnabled = Boolean(payload.lockEnabled);
@@ -790,11 +883,32 @@ class Store {
       ownerProfiles: this.normalizeOwnerProfiles(settingsPayload.ownerProfiles || settingsPayload.ownerprofiles),
       defaultFixedExpensesOwner: defaultOwnersFromPayload[0] || '',
       defaultFixedExpensesOwners: defaultOwnersFromPayload,
+      bankAccounts: this.normalizeBankAccounts(
+        settingsPayload.bankAccounts || settingsPayload.bankaccounts || []
+      ),
       bankModeEnabled: Boolean(settingsPayload.bankModeEnabled),
       lockEnabled: Boolean(settingsPayload.lockEnabled),
       lockSalt: typeof settingsPayload.lockSalt === 'string' ? settingsPayload.lockSalt : '',
       lockHash: typeof settingsPayload.lockHash === 'string' ? settingsPayload.lockHash : ''
     };
+
+    const accountSet = new Set(settings.bankAccounts);
+    settings.ownerProfiles = settings.ownerProfiles.map((profile) => {
+      const contributions = {};
+      Object.entries(profile.bankContributions || {}).forEach(([account, value]) => {
+        if (!accountSet.has(account)) return;
+        contributions[account] = value;
+      });
+      const totalContribution = Object.values(contributions).reduce(
+        (sum, value) => sum + (Number.isFinite(value) ? Number(value) : 0),
+        0
+      );
+      return {
+        ...profile,
+        bankContributions: contributions,
+        sharedContribution: totalContribution > 0 ? totalContribution : profile.sharedContribution
+      };
+    });
 
     const counters = data.counters || {
       categories: Math.max(0, ...categories.map((c) => c.id || 0)),

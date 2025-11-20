@@ -301,6 +301,7 @@ app.post('/api/faste-utgifter', (req, res) => {
     startDate = '',
     bindingEndDate = '',
     noticePeriodMonths = null,
+    account = '',
     note = ''
   } = req.body;
 
@@ -324,6 +325,7 @@ app.post('/api/faste-utgifter', (req, res) => {
     amountPerMonth,
     category: typeof category === 'string' && category.trim() ? category.trim() : 'Annet',
     owners: normalizeOwnersInput(owners),
+    account: typeof account === 'string' ? account.trim() : '',
     level,
     startDate,
     bindingEndDate,
@@ -344,13 +346,16 @@ app.post('/api/faste-utgifter/bulk-owners', (req, res) => {
 
 app.put('/api/faste-utgifter/:id', (req, res) => {
   const { id } = req.params;
-  const { category, level, noticePeriodMonths, owners } = req.body;
+  const { category, level, noticePeriodMonths, owners, account } = req.body;
   if (level && !FIXED_EXPENSE_LEVELS.includes(level)) {
     return res.status(400).json({ error: 'Ugyldig nivå.' });
   }
   const update = { ...req.body };
   if (category !== undefined) {
     update.category = typeof category === 'string' && category.trim() ? category.trim() : 'Annet';
+  }
+  if (account !== undefined) {
+    update.account = typeof account === 'string' ? account.trim() : '';
   }
   if (req.body.amountPerMonth !== undefined && Number.isNaN(Number(req.body.amountPerMonth))) {
     return res.status(400).json({ error: 'Beløp per måned må være et tall.' });
@@ -394,6 +399,7 @@ app.put('/api/settings', (req, res) => {
     ownerProfiles,
     defaultFixedExpensesOwner,
     defaultFixedExpensesOwners,
+    bankAccounts,
     bankModeEnabled,
     lockPassword,
     lockEnabled,
@@ -402,6 +408,10 @@ app.put('/api/settings', (req, res) => {
   const update = {};
   const currentlyLocked = isLockEnabled();
   let shouldInvalidateLockSessions = false;
+  const currentSettings = db.getSettings();
+  const currentBankAccounts = Array.isArray(currentSettings.bankAccounts)
+    ? currentSettings.bankAccounts
+    : [];
 
   if (monthlyNetIncome !== undefined) {
     const value = Number(monthlyNetIncome);
@@ -415,6 +425,14 @@ app.put('/api/settings', (req, res) => {
     if (!Array.isArray(ownerProfiles)) {
       return res.status(400).json({ error: 'Personer må sendes som en liste.' });
     }
+    const validAccounts = new Set(
+      Array.isArray(bankAccounts)
+        ? bankAccounts
+            .filter((name) => typeof name === 'string')
+            .map((name) => name.trim())
+            .filter(Boolean)
+        : currentBankAccounts
+    );
     const sanitizedProfiles = [];
     for (const profile of ownerProfiles) {
       if (!profile || typeof profile.name !== 'string') continue;
@@ -432,7 +450,28 @@ app.put('/api/settings', (req, res) => {
           .status(400)
           .json({ error: 'Bidrag til felleskonto må være et ikke-negativt tall.' });
       }
-      sanitizedProfiles.push({ name, monthlyNetIncome: income, sharedContribution });
+      const bankContributions = {};
+      if (profile && typeof profile.bankContributions === 'object') {
+        Object.entries(profile.bankContributions).forEach(([account, value]) => {
+          if (typeof account !== 'string') return;
+          const trimmed = account.trim();
+          const numeric = Number(value);
+          if (!trimmed || !Number.isFinite(numeric) || numeric < 0) return;
+          if (validAccounts.size === 0 || validAccounts.has(trimmed)) {
+            bankContributions[trimmed] = numeric;
+          }
+        });
+      }
+      const totalBankContribution = Object.values(bankContributions).reduce(
+        (sum, value) => sum + (Number.isFinite(value) ? Number(value) : 0),
+        0
+      );
+      sanitizedProfiles.push({
+        name,
+        monthlyNetIncome: income,
+        sharedContribution: totalBankContribution > 0 ? totalBankContribution : sharedContribution,
+        bankContributions
+      });
     }
     update.ownerProfiles = sanitizedProfiles;
   }
@@ -468,6 +507,21 @@ app.put('/api/settings', (req, res) => {
 
   if (bankModeEnabled !== undefined) {
     update.bankModeEnabled = Boolean(bankModeEnabled);
+  }
+
+  if (bankAccounts !== undefined) {
+    if (!Array.isArray(bankAccounts)) {
+      return res.status(400).json({ error: 'Bankkontoer må sendes som en liste.' });
+    }
+    const sanitizedAccounts = Array.from(
+      new Set(
+        bankAccounts
+          .filter((name) => typeof name === 'string')
+          .map((name) => name.trim())
+          .filter(Boolean)
+      )
+    );
+    update.bankAccounts = sanitizedAccounts;
   }
 
   if (lockPassword !== undefined) {

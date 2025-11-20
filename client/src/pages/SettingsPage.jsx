@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api.js';
 
 const SettingsPage = () => {
@@ -32,6 +32,12 @@ const SettingsPage = () => {
   const [bankModeStatus, setBankModeStatus] = useState('');
   const [bankModeError, setBankModeError] = useState('');
   const [isUpdatingBankMode, setIsUpdatingBankMode] = useState(false);
+  const [bankAccounts, setBankAccounts] = useState([]);
+  const [bankAccountsDraft, setBankAccountsDraft] = useState([]);
+  const [newBankAccount, setNewBankAccount] = useState('');
+  const [bankAccountStatus, setBankAccountStatus] = useState('');
+  const [bankAccountError, setBankAccountError] = useState('');
+  const [isSavingBankAccounts, setIsSavingBankAccounts] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -44,7 +50,8 @@ const SettingsPage = () => {
           if (profile?.name) {
             normalized[profile.name] = {
               income: String(profile.monthlyNetIncome ?? ''),
-              shared: String(profile.sharedContribution ?? '')
+              shared: String(profile.sharedContribution ?? ''),
+              bankContributions: profile.bankContributions || {}
             };
           }
         });
@@ -57,6 +64,9 @@ const SettingsPage = () => {
         setDefaultOwners(defaults);
         setLockEnabled(Boolean(data.lockEnabled));
         setBankModeEnabled(Boolean(data.bankModeEnabled));
+        const accounts = Array.isArray(data.bankAccounts) ? data.bankAccounts : [];
+        setBankAccounts(accounts);
+        setBankAccountsDraft(accounts);
       } catch (err) {
         if (!isMounted) return;
         setOwnerError('Kunne ikke hente personer: ' + err.message);
@@ -112,6 +122,27 @@ const SettingsPage = () => {
     return Array.from(names).sort((a, b) => a.localeCompare(b, 'no'));
   }, [ownersFromExpenses, ownerInputs, defaultOwners]);
 
+  const syncOwnerBankContributions = useCallback((accounts) => {
+    const allowedAccounts = new Set(accounts || []);
+    setOwnerInputs((current) => {
+      const next = {};
+      Object.entries(current).forEach(([name, values]) => {
+        const filtered = {};
+        Object.entries(values.bankContributions || {}).forEach(([account, amount]) => {
+          if (allowedAccounts.has(account)) {
+            filtered[account] = amount;
+          }
+        });
+        next[name] = { ...values, bankContributions: filtered };
+      });
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    syncOwnerBankContributions(bankAccountsDraft);
+  }, [bankAccountsDraft, syncOwnerBankContributions]);
+
   const syncOwnersFromPayload = (payload = {}) => {
     if (Array.isArray(payload.ownerProfiles)) {
       const refreshed = {};
@@ -119,7 +150,8 @@ const SettingsPage = () => {
         if (profile?.name) {
           refreshed[profile.name] = {
             income: String(profile.monthlyNetIncome ?? ''),
-            shared: String(profile.sharedContribution ?? '')
+            shared: String(profile.sharedContribution ?? ''),
+            bankContributions: profile.bankContributions || {}
           };
         }
       });
@@ -140,6 +172,12 @@ const SettingsPage = () => {
       ).sort((a, b) => a.localeCompare(b, 'no'));
       setOwnersFromExpenses(owners);
     }
+
+    if (Array.isArray(payload.bankAccounts)) {
+      setBankAccounts(payload.bankAccounts);
+      setBankAccountsDraft(payload.bankAccounts);
+      syncOwnerBankContributions(payload.bankAccounts);
+    }
   };
 
   const handleOwnerIncomeChange = (name, value) => {
@@ -156,6 +194,55 @@ const SettingsPage = () => {
     }));
   };
 
+  const handleOwnerBankContributionChange = (name, account, value) => {
+    setOwnerInputs((current) => {
+      const existing = current[name] || {};
+      const contributions = { ...(existing.bankContributions || {}) };
+      contributions[account] = value;
+      return { ...current, [name]: { ...existing, bankContributions: contributions } };
+    });
+  };
+
+  const handleAddBankAccount = (event) => {
+    event.preventDefault();
+    setBankAccountStatus('');
+    setBankAccountError('');
+    const trimmed = newBankAccount.trim();
+    if (!trimmed) {
+      setBankAccountError('Skriv inn et kontonavn.');
+      return;
+    }
+    if (bankAccountsDraft.some((account) => account.toLowerCase() === trimmed.toLowerCase())) {
+      setBankAccountError('Denne kontoen finnes allerede.');
+      return;
+    }
+    setBankAccountsDraft((current) => [...current, trimmed]);
+    setNewBankAccount('');
+  };
+
+  const handleRemoveBankAccount = (account) => {
+    setBankAccountsDraft((current) => current.filter((item) => item !== account));
+  };
+
+  const handleSaveBankAccounts = async () => {
+    setBankAccountStatus('');
+    setBankAccountError('');
+    setIsSavingBankAccounts(true);
+    try {
+      const sanitized = Array.from(new Set(bankAccountsDraft.map((account) => account.trim()).filter(Boolean)));
+      const updated = await api.updateSettings({ bankAccounts: sanitized });
+      const nextAccounts = Array.isArray(updated.bankAccounts) ? updated.bankAccounts : sanitized;
+      setBankAccounts(nextAccounts);
+      setBankAccountsDraft(nextAccounts);
+      syncOwnerBankContributions(nextAccounts);
+      setBankAccountStatus('Bankkontoer oppdatert.');
+    } catch (err) {
+      setBankAccountError(err.message || 'Kunne ikke oppdatere kontoer.');
+    } finally {
+      setIsSavingBankAccounts(false);
+    }
+  };
+
   const handleAddOwner = (event) => {
     event.preventDefault();
     setOwnerStatus('');
@@ -169,7 +256,7 @@ const SettingsPage = () => {
       if (Object.prototype.hasOwnProperty.call(current, trimmed)) {
         return current;
       }
-      return { ...current, [trimmed]: { income: '', shared: '' } };
+      return { ...current, [trimmed]: { income: '', shared: '', bankContributions: {} } };
     });
     setNewOwnerName('');
   };
@@ -196,11 +283,32 @@ const SettingsPage = () => {
           if (!Number.isFinite(numericIncome) || numericIncome < 0) {
             throw new Error(`Beløpet for ${trimmedName} må være et ikke-negativt tall.`);
           }
+          const bankContributions = {};
+          bankAccounts.forEach((account) => {
+            const rawValue = value?.bankContributions?.[account];
+            if (rawValue === '' || rawValue === null || rawValue === undefined) return;
+            const numeric = Number(rawValue);
+            if (!Number.isFinite(numeric) || numeric < 0) {
+              throw new Error(`Bidraget for ${trimmedName} på ${account} må være et ikke-negativt tall.`);
+            }
+            bankContributions[account] = numeric;
+          });
+
           const numericShared = Number(value?.shared ?? 0);
           if (!Number.isFinite(numericShared) || numericShared < 0) {
             throw new Error(`Bidraget for ${trimmedName} må være et ikke-negativt tall.`);
           }
-          return { name: trimmedName, monthlyNetIncome: numericIncome, sharedContribution: numericShared };
+          const totalBankContribution = Object.values(bankContributions).reduce(
+            (sum, contribution) => sum + (Number.isFinite(contribution) ? Number(contribution) : 0),
+            0
+          );
+          const sharedContribution = totalBankContribution > 0 ? totalBankContribution : numericShared;
+          return {
+            name: trimmedName,
+            monthlyNetIncome: numericIncome,
+            sharedContribution,
+            bankContributions
+          };
         });
       const updated = await api.updateSettings({ ownerProfiles: payload });
       syncOwnersFromPayload(updated);
@@ -593,6 +701,80 @@ const SettingsPage = () => {
           </div>
         </section>
 
+        {bankModeEnabled && (
+          <section className="card settings-card">
+            <div className="settings-card-header">
+              <div>
+                <p className="eyebrow">Bank-modus</p>
+                <h3>Konti for faste utgifter</h3>
+                <p className="muted">
+                  Legg til felleskontoer eller regningskontoer. Disse kan velges på faste utgifter og i
+                  fordelingen av bankbidrag.
+                </p>
+              </div>
+              {(bankAccountStatus || bankAccountError) && (
+                <p className={`settings-status-inline ${bankAccountError ? 'error-text' : 'success-text'}`}>
+                  {bankAccountError || bankAccountStatus}
+                </p>
+              )}
+            </div>
+            <div className="settings-subgrid">
+              <div className="settings-tile">
+                <div>
+                  <h4>Registrerte kontoer</h4>
+                  <p className="muted">
+                    Kontoene vises som valg i Faste utgifter. Fjern en konto for å rydde opp i listen.
+                  </p>
+                </div>
+                <div className="bank-account-list">
+                  {bankAccountsDraft.length === 0 && <p className="muted">Ingen kontoer lagt til ennå.</p>}
+                  {bankAccountsDraft.map((account) => (
+                    <div key={account} className="bank-account-row">
+                      <span className="bank-account-name">{account}</span>
+                      <button
+                        type="button"
+                        className="ghost"
+                        onClick={() => handleRemoveBankAccount(account)}
+                        disabled={isSavingBankAccounts}
+                      >
+                        Fjern
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="settings-tile">
+                <div>
+                  <h4>Ny konto</h4>
+                  <p className="muted">Gi kontoen et navn som «Regningskonto» eller «Felles spare». </p>
+                </div>
+                <form className="inline-form" onSubmit={handleAddBankAccount}>
+                  <label htmlFor="new-bank-account">Kontonavn</label>
+                  <input
+                    id="new-bank-account"
+                    value={newBankAccount}
+                    onChange={(e) => setNewBankAccount(e.target.value)}
+                    placeholder="F.eks. Regningskonto"
+                  />
+                  <button type="submit" disabled={isSavingBankAccounts}>
+                    Legg til konto
+                  </button>
+                </form>
+                <div className="settings-actions">
+                  <button
+                    type="button"
+                    onClick={handleSaveBankAccounts}
+                    className="save-owner-button"
+                    disabled={isSavingBankAccounts}
+                  >
+                    {isSavingBankAccounts ? 'Lagrer…' : 'Lagre kontoer'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
         <section className="card owner-income-card settings-card">
           <div className="settings-card-header">
             <div>
@@ -709,6 +891,30 @@ const SettingsPage = () => {
                             <p className="muted owner-income-hint">
                               Trekkes fra personlig lønn og legges i fellespotten.
                             </p>
+                          </div>
+                        )}
+                        {bankModeEnabled && bankAccountsDraft.length > 0 && (
+                          <div className="bank-contribution-inputs">
+                            <p className="muted owner-income-hint">Fordel bidrag til hver konto.</p>
+                            <div className="bank-contribution-grid">
+                              {bankAccountsDraft.map((account) => (
+                                <label key={`${name}-${account}`} className="muted">
+                                  {account}
+                                  <div className="currency-input">
+                                    <span className="currency-prefix">kr</span>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      placeholder="0"
+                                      value={ownerInputs[name]?.bankContributions?.[account] ?? ''}
+                                      onChange={(e) =>
+                                        handleOwnerBankContributionChange(name, account, e.target.value)
+                                      }
+                                    />
+                                  </div>
+                                </label>
+                              ))}
+                            </div>
                           </div>
                         )}
                         <div className="owner-action-buttons">

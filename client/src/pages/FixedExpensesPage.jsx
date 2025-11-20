@@ -36,11 +36,12 @@ const hexToRgba = (hex, alpha = 1) => {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
 
-const createEmptyForm = (category = FALLBACK_CATEGORY_OPTIONS[0], owners = []) => ({
+const createEmptyForm = (category = FALLBACK_CATEGORY_OPTIONS[0], owners = [], account = '') => ({
   name: '',
   amountPerMonth: '',
   category,
   owners: Array.isArray(owners) ? [...owners] : [],
+  account,
   level: LEVEL_OPTIONS[0],
   startDate: '',
   bindingEndDate: '',
@@ -129,6 +130,7 @@ const FixedExpensesPage = () => {
   const [expandedPriceIds, setExpandedPriceIds] = useState([]);
   const [customOwnerInput, setCustomOwnerInput] = useState('');
   const [bankModeEnabled, setBankModeEnabled] = useState(false);
+  const [bankAccounts, setBankAccounts] = useState([]);
   const ownerOptions = useMemo(() => {
     const set = new Set();
     expenses.forEach((expense) => {
@@ -189,6 +191,7 @@ const FixedExpensesPage = () => {
         setMonthlyNetIncome(Number(settings.monthlyNetIncome) || 0);
         setOwnerProfiles(Array.isArray(settings.ownerProfiles) ? settings.ownerProfiles : []);
         setBankModeEnabled(Boolean(settings.bankModeEnabled));
+        setBankAccounts(Array.isArray(settings.bankAccounts) ? settings.bankAccounts : []);
         const defaultOwnerList = Array.isArray(settings.defaultFixedExpensesOwners)
           ? settings.defaultFixedExpensesOwners
           : typeof settings.defaultFixedExpensesOwner === 'string' && settings.defaultFixedExpensesOwner.trim()
@@ -592,6 +595,7 @@ const FixedExpensesPage = () => {
         amountPerMonth: expense.amountPerMonth,
         category: expense.category || categoryOptions[0] || FALLBACK_CATEGORY_OPTIONS[0],
         owners: Array.isArray(expense.owners) ? expense.owners : [],
+        account: expense.account || '',
         level: expense.level,
         startDate: expense.startDate || '',
         bindingEndDate: expense.bindingEndDate || '',
@@ -600,7 +604,13 @@ const FixedExpensesPage = () => {
       });
     } else {
       setEditingId(null);
-      setForm(createEmptyForm(categoryOptions[0] || FALLBACK_CATEGORY_OPTIONS[0], defaultOwners));
+      setForm(
+        createEmptyForm(
+          categoryOptions[0] || FALLBACK_CATEGORY_OPTIONS[0],
+          defaultOwners,
+          bankAccounts[0] || ''
+        )
+      );
     }
     setCustomOwnerInput('');
     setShowForm(true);
@@ -608,10 +618,16 @@ const FixedExpensesPage = () => {
 
   const closeForm = useCallback(() => {
     setShowForm(false);
-    setForm(createEmptyForm(categoryOptions[0] || FALLBACK_CATEGORY_OPTIONS[0], defaultOwners));
+    setForm(
+      createEmptyForm(
+        categoryOptions[0] || FALLBACK_CATEGORY_OPTIONS[0],
+        defaultOwners,
+        bankAccounts[0] || ''
+      )
+    );
     setEditingId(null);
     setCustomOwnerInput('');
-  }, [categoryOptions, defaultOwners]);
+  }, [bankAccounts, categoryOptions, defaultOwners]);
 
   const handleToggleOwnerFilter = useCallback(
     (owner) => {
@@ -648,6 +664,7 @@ const FixedExpensesPage = () => {
             .filter(Boolean)
         )
       ),
+      account: form.account || '',
       level: form.level,
       startDate: form.startDate || '',
       bindingEndDate: form.bindingEndDate || '',
@@ -1033,6 +1050,9 @@ const FixedExpensesPage = () => {
                                 </div>
                               )}
                             </div>
+                            {expense.account && (
+                              <p className="muted subtle-label">Betales fra: {expense.account}</p>
+                            )}
                             {expense.note && <p className="expense-note">{expense.note}</p>}
                           </div>
                           <div className="expense-amount">
@@ -1302,6 +1322,25 @@ const FixedExpensesPage = () => {
                 </button>
               </div>
             </div>
+            {bankModeEnabled && bankAccounts.length > 0 && (
+              <div className="form-field">
+                <label className="muted" htmlFor="expense-account">
+                  Betales fra konto
+                </label>
+                <select
+                  id="expense-account"
+                  value={form.account}
+                  onChange={(e) => setForm({ ...form, account: e.target.value })}
+                >
+                  <option value="">Ikke spesifisert</option>
+                  {bankAccounts.map((account) => (
+                    <option key={account} value={account}>
+                      {account}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <label className="muted">Startdato</label>
             <input type="date" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} />
             <label className="muted">Binding utløper</label>
