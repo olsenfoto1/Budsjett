@@ -283,6 +283,36 @@ main {
   flex-direction: column;
   gap: 0.65rem;
   min-height: 100%;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  z-index: 0;
+}
+
+:root[data-theme='dark'] .settings-tile {
+  border-color: rgba(148, 163, 184, 0.35);
+}
+
+:root[data-theme='dark'] .settings-tile::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: linear-gradient(145deg, rgba(185, 198, 255, 0.18), rgba(14, 165, 233, 0.08));
+  z-index: -1;
+  opacity: 0.9;
+}
+
+:root[data-theme='dark'] .settings-subgrid .settings-tile:nth-child(3n + 1)::before {
+  background: linear-gradient(140deg, rgba(99, 102, 241, 0.26), rgba(14, 165, 233, 0.14));
+}
+
+:root[data-theme='dark'] .settings-subgrid .settings-tile:nth-child(3n + 2)::before {
+  background: linear-gradient(150deg, rgba(16, 185, 129, 0.2), rgba(52, 211, 153, 0.12));
+}
+
+:root[data-theme='dark'] .settings-subgrid .settings-tile:nth-child(3n + 3)::before {
+  background: linear-gradient(160deg, rgba(244, 114, 182, 0.22), rgba(251, 146, 60, 0.12));
 }
 
 .settings-actions {
@@ -1479,6 +1509,26 @@ select:focus {
   box-shadow: 0 12px 40px -24px rgba(0, 0, 0, 0.35);
 }
 
+:root[data-theme='dark'] .owner-panel {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  border-color: rgba(148, 163, 184, 0.35);
+  background: linear-gradient(150deg, rgba(12, 16, 30, 0.95), rgba(7, 11, 24, 0.9));
+  box-shadow: 0 18px 55px -25px rgba(0, 0, 0, 0.7);
+}
+
+:root[data-theme='dark'] .owner-panel::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: radial-gradient(circle at 12% 20%, rgba(185, 198, 255, 0.14), transparent 35%),
+    radial-gradient(circle at 80% 8%, rgba(34, 211, 238, 0.14), transparent 32%),
+    linear-gradient(155deg, rgba(244, 114, 182, 0.12), rgba(99, 102, 241, 0.1));
+  z-index: -1;
+}
+
 .owner-panel-header {
   display: flex;
   align-items: flex-start;
@@ -1522,6 +1572,37 @@ select:focus {
   border-radius: 1rem;
   background: var(--surface);
   border: 1px solid var(--border-color);
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  z-index: 0;
+}
+
+:root[data-theme='dark'] .owner-income-tile {
+  background: linear-gradient(150deg, rgba(10, 14, 26, 0.92), rgba(7, 11, 20, 0.92));
+  border-color: rgba(148, 163, 184, 0.35);
+}
+
+:root[data-theme='dark'] .owner-income-tiles .owner-income-tile::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: linear-gradient(145deg, rgba(185, 198, 255, 0.18), rgba(14, 165, 233, 0.08));
+  z-index: -1;
+  opacity: 0.95;
+}
+
+:root[data-theme='dark'] .owner-income-tiles .owner-income-tile:nth-child(3n + 1)::before {
+  background: linear-gradient(150deg, rgba(244, 114, 182, 0.18), rgba(79, 70, 229, 0.12));
+}
+
+:root[data-theme='dark'] .owner-income-tiles .owner-income-tile:nth-child(3n + 2)::before {
+  background: linear-gradient(150deg, rgba(52, 211, 153, 0.16), rgba(34, 211, 238, 0.12));
+}
+
+:root[data-theme='dark'] .owner-income-tiles .owner-income-tile:nth-child(3n + 3)::before {
+  background: linear-gradient(150deg, rgba(248, 180, 0, 0.16), rgba(251, 146, 60, 0.12));
 }
 
 .owner-avatar {
@@ -1535,6 +1616,11 @@ select:focus {
   align-items: center;
   justify-content: center;
   font-size: 1rem;
+}
+
+:root[data-theme='dark'] .owner-avatar {
+  background: rgba(99, 102, 241, 0.18);
+  color: #c7d2fe;
 }
 
 .owner-income-meta .owner-name {
@@ -1589,6 +1675,23 @@ select:focus {
   text-align: left;
   cursor: pointer;
   transition: border 0.2s ease, box-shadow 0.2s ease, transform 0.1s ease;
+}
+
+:root[data-theme='dark'] .owner-chip {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  background: linear-gradient(150deg, rgba(12, 16, 30, 0.92), rgba(7, 11, 20, 0.92));
+  border-color: rgba(148, 163, 184, 0.35);
+}
+
+:root[data-theme='dark'] .owner-chip::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: linear-gradient(150deg, rgba(185, 198, 255, 0.18), rgba(14, 165, 233, 0.08));
+  z-index: -1;
 }
 
 .owner-chip:hover:not(:disabled) {
