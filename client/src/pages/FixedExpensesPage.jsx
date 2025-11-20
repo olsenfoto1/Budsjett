@@ -966,40 +966,38 @@ const FixedExpensesPage = () => {
                       <article className="expense-entry" key={expense.id}>
                         <div className="expense-entry-top">
                           <div className="expense-entry-main">
-                            <div>
-                              <p className="expense-name">{expense.name}</p>
-                              {expense.startDate && (
-                                <small className="muted subtle-label">Startet {formatDate(expense.startDate)}</small>
+                            <p className="expense-name">{expense.name}</p>
+                            {expense.startDate && (
+                              <small className="muted subtle-label">Startet {formatDate(expense.startDate)}</small>
+                            )}
+                            <div className="expense-meta">
+                              <span className="badge">{expense.level}</span>
+                              <span className="muted">Binding: {formatDate(expense.bindingEndDate)}</span>
+                              <span className="muted">Oppsigelse: {formatNotice(expense.noticePeriodMonths)}</span>
+                            </div>
+                            <div className="expense-owners">
+                              {(expense.owners || []).length === 0 ? (
+                                <span className="muted">Ingen eiere</span>
+                              ) : (
+                                <div className="chip-list">
+                                  {(expense.owners || []).map((owner) => (
+                                    <button
+                                      type="button"
+                                      className={`chip chip-button${activeOwners.includes(owner) ? ' chip-active' : ''}`}
+                                      key={owner}
+                                      onClick={() => handleToggleOwnerFilter(owner)}
+                                    >
+                                      {owner}
+                                    </button>
+                                  ))}
+                                </div>
                               )}
-                              <div className="expense-meta">
-                                <span className="badge">{expense.level}</span>
-                                <span className="muted">Binding: {formatDate(expense.bindingEndDate)}</span>
-                                <span className="muted">Oppsigelse: {formatNotice(expense.noticePeriodMonths)}</span>
-                              </div>
-                              <div className="expense-owners">
-                                {(expense.owners || []).length === 0 ? (
-                                  <span className="muted">Ingen eiere</span>
-                                ) : (
-                                  <div className="chip-list">
-                                    {(expense.owners || []).map((owner) => (
-                                      <button
-                                        type="button"
-                                        className={`chip chip-button${activeOwners.includes(owner) ? ' chip-active' : ''}`}
-                                        key={owner}
-                                        onClick={() => handleToggleOwnerFilter(owner)}
-                                      >
-                                        {owner}
-                                      </button>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                              {expense.note && <p className="expense-note">{expense.note}</p>}
                             </div>
-                            <div className="expense-amount">
-                              <span className="muted">Per måned</span>
-                              <strong>{formatCurrency(expense.amountPerMonth)}</strong>
-                            </div>
+                            {expense.note && <p className="expense-note">{expense.note}</p>}
+                          </div>
+                          <div className="expense-amount">
+                            <span className="muted subtle-label">Per måned</span>
+                            <strong>{formatCurrency(expense.amountPerMonth)}</strong>
                           </div>
                         </div>
                         {isPriceSectionOpen && (
