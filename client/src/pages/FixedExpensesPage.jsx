@@ -276,16 +276,21 @@ const FixedExpensesPage = () => {
   const hasAccountFilter = bankModeEnabled && selectedAccounts.length > 0;
 
   const filteredExpenses = useMemo(() => {
-    let result = expenses;
-    if (activeOwners.length) {
-      result = result.filter((expense) =>
-        (expense.owners || []).some((owner) => activeOwners.includes(owner))
-      );
-    }
-    if (hasAccountFilter) {
-      result = result.filter((expense) => selectedAccounts.includes(expense.account));
-    }
-    return result;
+    const hasOwnerFilter = activeOwners.length > 0;
+
+    // Når både eierfilter og kontofilter er på, skal vi vise unionen av treff –
+    // altså både personlige utgifter og utgifter på valgt felleskonto.
+    return expenses.filter((expense) => {
+      const matchesOwner = !hasOwnerFilter
+        || (expense.owners || []).some((owner) => activeOwners.includes(owner));
+      const matchesAccount = !hasAccountFilter || selectedAccounts.includes(expense.account);
+
+      if (hasOwnerFilter && hasAccountFilter) {
+        return matchesOwner || matchesAccount;
+      }
+
+      return matchesOwner && matchesAccount;
+    });
   }, [expenses, activeOwners, hasAccountFilter, selectedAccounts]);
 
   const categoryTotals = useMemo(() => {
