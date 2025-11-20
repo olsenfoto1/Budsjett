@@ -23,6 +23,8 @@ const SettingsPage = () => {
   const [confirmLockPassword, setConfirmLockPassword] = useState('');
   const [currentLockPassword, setCurrentLockPassword] = useState('');
   const [isUpdatingLock, setIsUpdatingLock] = useState(false);
+  const [cacheStatus, setCacheStatus] = useState('');
+  const [isClearingCache, setIsClearingCache] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -284,6 +286,28 @@ const SettingsPage = () => {
     }
   };
 
+  const handleClearCache = async () => {
+    setCacheStatus('');
+    setIsClearingCache(true);
+    try {
+      if ('serviceWorker' in navigator && navigator.serviceWorker.getRegistrations) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.map((registration) => registration.unregister()));
+      }
+
+      if ('caches' in window) {
+        const cacheNames = await caches.keys();
+        await Promise.all(cacheNames.map((name) => caches.delete(name)));
+      }
+
+      setCacheStatus('Cache er slettet. Last siden på nytt for å hente siste versjon.');
+    } catch (err) {
+      setCacheStatus('Kunne ikke slette cache: ' + err.message);
+    } finally {
+      setIsClearingCache(false);
+    }
+  };
+
   return (
     <div className="settings-page">
       <div className="section-header">
@@ -322,6 +346,24 @@ const SettingsPage = () => {
                 <input type="file" ref={fileRef} accept="application/json" />
                 <button onClick={handleImport}>Importer</button>
               </div>
+            </div>
+            <div className="settings-tile">
+              <div>
+                <h4>Rydd PWA-cache</h4>
+                <p className="muted">
+                  Fjern mellomlagret innhold og tjenestearbeidere for å hente siste versjon av appen.
+                </p>
+              </div>
+              <div className="settings-actions">
+                <button onClick={handleClearCache} disabled={isClearingCache}>
+                  {isClearingCache ? 'Rydder…' : 'Tøm cache'}
+                </button>
+              </div>
+              {cacheStatus && (
+                <p className={`muted ${cacheStatus.startsWith('Kunne') ? 'error-text' : ''}`}>
+                  {cacheStatus}
+                </p>
+              )}
             </div>
           </div>
         </section>
