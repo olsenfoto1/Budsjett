@@ -894,26 +894,24 @@ const SettingsPage = () => {
                     const isEditing = editingOwner === name;
                     return (
                       <div key={name} className="owner-income-tile">
-                        <div className="owner-profile">
-                          <div className="owner-avatar" aria-hidden>
-                            {name.charAt(0).toUpperCase()}
-                          </div>
-                          <div className="owner-income-meta">
-                            <label className="muted" htmlFor={`owner-name-${name}`}>
-                              Navn
-                            </label>
-                            {isEditing ? (
-                              <input
-                                id={`owner-name-${name}`}
-                                value={editedOwnerName}
-                                onChange={(e) => setEditedOwnerName(e.target.value)}
-                                placeholder="Nytt navn"
-                              />
-                            ) : (
-                              <p className="owner-name">{name}</p>
-                            )}
-                            <p className="muted owner-income-hint">Beløp og navn brukes på hele siden.</p>
-                          </div>
+                        <div className="owner-avatar" aria-hidden>
+                          {name.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="owner-income-meta">
+                          <label className="muted" htmlFor={`owner-name-${name}`}>
+                            Navn
+                          </label>
+                          {isEditing ? (
+                            <input
+                              id={`owner-name-${name}`}
+                              value={editedOwnerName}
+                              onChange={(e) => setEditedOwnerName(e.target.value)}
+                              placeholder="Nytt navn"
+                            />
+                          ) : (
+                            <p className="owner-name">{name}</p>
+                          )}
+                          <p className="muted owner-income-hint">Beløp og navn brukes på hele siden.</p>
                         </div>
                         <div className="owner-income-input">
                           <label className="muted" htmlFor={`owner-income-${name}`}>
