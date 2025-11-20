@@ -262,6 +262,28 @@ const SettingsPage = () => {
     }
   };
 
+  const handleClearBankAccounts = async () => {
+    setBankAccountStatus('');
+    setBankAccountError('');
+    setIsSavingBankAccounts(true);
+    try {
+      const updated = await api.updateSettings({
+        bankAccounts: [],
+        defaultFixedExpensesBankAccount: ''
+      });
+      const nextAccounts = Array.isArray(updated.bankAccounts) ? updated.bankAccounts : [];
+      setBankAccounts(nextAccounts);
+      setBankAccountsDraft(nextAccounts);
+      setDefaultAccount('');
+      syncOwnerBankContributions(nextAccounts);
+      setBankAccountStatus('Alle bankkontoer er slettet.');
+    } catch (err) {
+      setBankAccountError(err.message || 'Kunne ikke slette kontoene.');
+    } finally {
+      setIsSavingBankAccounts(false);
+    }
+  };
+
   const handleAddOwner = (event) => {
     event.preventDefault();
     setOwnerStatus('');
@@ -758,7 +780,7 @@ const SettingsPage = () => {
           </div>
         </section>
 
-        {bankModeEnabled && (
+        {(bankModeEnabled || bankAccountsDraft.length > 0) && (
           <section className="card settings-card">
             <div className="settings-card-header">
               <div>
@@ -768,6 +790,11 @@ const SettingsPage = () => {
                   Legg til felleskontoer eller regningskontoer. Disse kan velges på faste utgifter og i
                   fordelingen av bankbidrag.
                 </p>
+                {!bankModeEnabled && bankAccountsDraft.length > 0 && (
+                  <p className="muted">
+                    Bank-modus er slått av, men du kan slette eller rydde opp i gamle felleskontoer under.
+                  </p>
+                )}
               </div>
               {(bankAccountStatus || bankAccountError) && (
                 <p className={`settings-status-inline ${bankAccountError ? 'error-text' : 'success-text'}`}>
@@ -799,6 +826,18 @@ const SettingsPage = () => {
                     </div>
                   ))}
                 </div>
+                {bankAccountsDraft.length > 0 && (
+                  <div className="settings-actions" style={{ marginTop: '0.5rem' }}>
+                    <button
+                      type="button"
+                      className="secondary"
+                      onClick={handleClearBankAccounts}
+                      disabled={isSavingBankAccounts}
+                    >
+                      {isSavingBankAccounts ? 'Sletter…' : 'Slett alle kontoer'}
+                    </button>
+                  </div>
+                )}
               </div>
               <div className="settings-tile">
                 <div>
