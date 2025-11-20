@@ -1334,6 +1334,42 @@ select:focus {
   gap: 0.35rem;
 }
 
+.transaction-search-card {
+  margin-top: 0.5rem;
+}
+
+.transaction-search-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.search-input-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 1.1rem;
+  background: var(--surface-soft);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+  margin-top: 0.85rem;
+}
+
+.search-icon {
+  font-size: 1.1rem;
+}
+
+.search-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: 1rem;
+  color: var(--text-primary);
+  outline: none;
+}
+
 .ghost-button {
   border: 1px solid var(--border-color);
   background: transparent;
@@ -1350,10 +1386,6 @@ select:focus {
 
 .ghost-button:hover {
   background: var(--surface-alt);
-}
-
-.search-icon {
-  font-size: 1.1rem;
 }
 
 .suggestion-list {
