@@ -460,131 +460,95 @@ const SettingsPage = () => {
               <h3>Personer og netto inntekt</h3>
               <p className="muted">Navn fra faste utgifter dukker opp automatisk. Legg inn beløp per måned per person.</p>
             </div>
-            <div className="settings-status-cluster">
-              {ownerStatus && <p className="settings-status-inline success">{ownerStatus}</p>}
-              {ownerError && <p className="settings-status-inline error-text">{ownerError}</p>}
-            </div>
+            {ownerStatus && (
+              <p className="settings-status-inline success">{ownerStatus}</p>
+            )}
+            {ownerError && <p className="settings-status-inline error-text">{ownerError}</p>}
           </div>
 
           {ownersLoading && <p className="muted">Laster personer…</p>}
           {!ownersLoading && ownerNames.length === 0 && (
-            <div className="empty-owner-state">
-              <p className="muted">Ingen personer funnet ennå. Legg til en ny person nedenfor.</p>
-              <p className="muted">Du kan definere både inntekt og hvilke personer som skal være standard.</p>
+            <p className="muted">Ingen personer funnet ennå. Legg til en ny person nedenfor.</p>
+          )}
+          {ownerNames.length > 0 && (
+            <div className="owner-income-list">
+              {ownerNames.map((name) => (
+                <div key={name} className="owner-income-row">
+                  <span>{name}</span>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="Beløp (NOK)"
+                    value={ownerInputs[name] ?? ''}
+                    onChange={(e) => handleOwnerIncomeChange(name, e.target.value)}
+                  />
+                </div>
+              ))}
             </div>
           )}
-
           {ownerNames.length > 0 && (
-            <div className="owner-setup-grid">
-              <div className="owner-panel">
-                <div className="owner-panel-header">
-                  <div>
-                    <p className="eyebrow">Netto per måned</p>
-                    <h4>Inntekt per person</h4>
-                    <p className="muted">Gi hver person et beløp i NOK for å få et realistisk budsjett.</p>
-                  </div>
-                  <span className="stat-chip">{ownerNames.length} personer</span>
-                </div>
-                <div className="owner-income-tiles">
-                  {ownerNames.map((name) => (
-                    <div key={name} className="owner-income-tile">
-                      <div className="owner-avatar" aria-hidden>
-                        {name.charAt(0).toUpperCase()}
-                      </div>
-                      <div className="owner-income-meta">
-                        <p className="owner-name">{name}</p>
-                        <p className="muted">Beløp per måned</p>
-                      </div>
-                      <div className="owner-income-input">
-                        <label className="muted" htmlFor={`owner-income-${name}`}>
-                          Netto
-                        </label>
-                        <div className="currency-input">
-                          <span className="currency-prefix">kr</span>
-                          <input
-                            id={`owner-income-${name}`}
-                            type="number"
-                            min="0"
-                            placeholder="0"
-                            value={ownerInputs[name] ?? ''}
-                            onChange={(e) => handleOwnerIncomeChange(name, e.target.value)}
-                          />
-                        </div>
+            <div className="default-owner-selector">
+              <p className="muted">
+                Velg hvilke tagger/navn som skal være standard for Faste utgifter. Du kan markere flere.
+              </p>
+              <div className="owner-default-list">
+                {ownerNames.map((name) => {
+                  const isSelected = defaultOwners.includes(name);
+                  return (
+                    <div key={`${name}-default`} className="owner-default-row">
+                      <span>{name}</span>
+                      <div className="owner-default-actions">
+                        <button
+                          type="button"
+                          className="secondary"
+                          onClick={() => toggleDefaultOwnerSelection(name)}
+                          disabled={isUpdatingDefaultOwner}
+                        >
+                          {isSelected ? 'Fjern fra standard' : 'Legg til i standard'}
+                        </button>
+                        {isSelected && <span className="badge">Valgt</span>}
                       </div>
                     </div>
-                  ))}
-                </div>
+                  );
+                })}
               </div>
-
-              <div className="owner-panel">
-                <div className="owner-panel-header">
-                  <div>
-                    <p className="eyebrow">Standardvalg</p>
-                    <h4>Tagger til faste utgifter</h4>
-                    <p className="muted">Velg hvilke personer som skal være forhåndsvalgt når du legger inn utgifter.</p>
-                  </div>
-                  {defaultOwners.length > 0 && <span className="stat-chip success">{defaultOwners.length} valgt</span>}
-                </div>
-                <div className="owner-default-chips">
-                  {ownerNames.map((name) => {
-                    const isSelected = defaultOwners.includes(name);
-                    return (
-                      <button
-                        key={`${name}-default`}
-                        type="button"
-                        className={`owner-chip ${isSelected ? 'selected' : ''}`}
-                        onClick={() => toggleDefaultOwnerSelection(name)}
-                        disabled={isUpdatingDefaultOwner}
-                      >
-                        <span className="owner-chip-initial" aria-hidden>
-                          {name.charAt(0).toUpperCase()}
-                        </span>
-                        <span className="owner-chip-name">{name}</span>
-                        <span className="owner-chip-status">{isSelected ? 'Standard' : 'Tilgjengelig'}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-                <div className="owner-default-footer">
-                  {defaultOwners.length > 0 && (
-                    <button
-                      type="button"
-                      className="ghost"
-                      onClick={() => handleUpdateDefaultOwners([])}
-                      disabled={isUpdatingDefaultOwner}
-                    >
-                      Fjern alle standardvalg
-                    </button>
-                  )}
-                  {defaultOwnerStatus && (
-                    <p className="muted success-text">{defaultOwnerStatus}</p>
-                  )}
-                  {defaultOwnerError && <p className="error-text">{defaultOwnerError}</p>}
-                </div>
-              </div>
+              {defaultOwners.length > 0 && (
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={() => handleUpdateDefaultOwners([])}
+                  disabled={isUpdatingDefaultOwner}
+                  style={{ marginTop: '0.75rem' }}
+                >
+                  Fjern alle standardvalg
+                </button>
+              )}
+              {defaultOwnerStatus && (
+                <p className="muted" style={{ marginTop: '0.5rem', color: '#16a34a' }}>
+                  {defaultOwnerStatus}
+                </p>
+              )}
+              {defaultOwnerError && <p className="error-text">{defaultOwnerError}</p>}
             </div>
           )}
-
-          <div className="owner-actions">
-            <form className="inline-form" onSubmit={handleAddOwner}>
-              <label htmlFor="new-owner-input">Legg til person</label>
-              <input
-                id="new-owner-input"
-                placeholder="F.eks. Ola"
-                value={newOwnerName}
-                onChange={(e) => setNewOwnerName(e.target.value)}
-              />
-              <button type="submit">Legg til</button>
-            </form>
-            <button
-              type="button"
-              onClick={handleSaveOwners}
-              disabled={isSavingOwners}
-              className="save-owner-button"
-            >
-              {isSavingOwners ? 'Lagrer…' : 'Lagre personlige inntekter'}
-            </button>
-          </div>
+          <form className="inline-form" onSubmit={handleAddOwner} style={{ marginTop: '1rem' }}>
+            <label htmlFor="new-owner-input">Legg til person</label>
+            <input
+              id="new-owner-input"
+              placeholder="F.eks. Ola"
+              value={newOwnerName}
+              onChange={(e) => setNewOwnerName(e.target.value)}
+            />
+            <button type="submit">Legg til</button>
+          </form>
+          <button
+            type="button"
+            onClick={handleSaveOwners}
+            disabled={isSavingOwners}
+            style={{ marginTop: '1rem' }}
+          >
+            {isSavingOwners ? 'Lagrer…' : 'Lagre personlige inntekter'}
+          </button>
         </section>
       </div>
 
