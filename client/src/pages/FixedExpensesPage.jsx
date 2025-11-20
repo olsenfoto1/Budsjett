@@ -131,6 +131,7 @@ const FixedExpensesPage = () => {
   const [customOwnerInput, setCustomOwnerInput] = useState('');
   const [bankModeEnabled, setBankModeEnabled] = useState(false);
   const [bankAccounts, setBankAccounts] = useState([]);
+  const [selectedAccounts, setSelectedAccounts] = useState([]);
   const ownerOptions = useMemo(() => {
     const set = new Set();
     expenses.forEach((expense) => {
@@ -249,6 +250,10 @@ const FixedExpensesPage = () => {
     loadCategories();
   }, [loadCategories]);
 
+  useEffect(() => {
+    setSelectedAccounts((current) => current.filter((account) => bankAccounts.includes(account)));
+  }, [bankAccounts]);
+
   const getCategoryStyle = useCallback(
     (categoryName) => {
       const color = categoryColorMap[categoryName] || FALLBACK_CATEGORY_COLORS[categoryName] || '#94a3b8';
@@ -268,12 +273,20 @@ const FixedExpensesPage = () => {
     [hasManualOwnerSelection, selectedOwners, defaultOwners]
   );
 
+  const hasAccountFilter = bankModeEnabled && selectedAccounts.length > 0;
+
   const filteredExpenses = useMemo(() => {
-    if (!activeOwners.length) return expenses;
-    return expenses.filter((expense) =>
-      (expense.owners || []).some((owner) => activeOwners.includes(owner))
-    );
-  }, [expenses, activeOwners]);
+    let result = expenses;
+    if (activeOwners.length) {
+      result = result.filter((expense) =>
+        (expense.owners || []).some((owner) => activeOwners.includes(owner))
+      );
+    }
+    if (hasAccountFilter) {
+      result = result.filter((expense) => selectedAccounts.includes(expense.account));
+    }
+    return result;
+  }, [expenses, activeOwners, hasAccountFilter, selectedAccounts]);
 
   const categoryTotals = useMemo(() => {
     const map = new Map();
@@ -572,9 +585,15 @@ const FixedExpensesPage = () => {
       ? activeOwners.filter((owner) => !ownerIncomeMap.has(owner))
       : [];
   const missingIncomeForOwner = missingIncomeOwners.length > 0;
-  const filterDescription = activeOwners.length
-    ? `utgiftene til ${activeOwners.join(', ')}`
-    : 'alle faste utgifter';
+  const filterDescription = useMemo(() => {
+    const ownerDescription = activeOwners.length
+      ? `utgiftene til ${activeOwners.join(', ')}`
+      : 'alle faste utgifter';
+    if (hasAccountFilter) {
+      return `${ownerDescription} fra ${selectedAccounts.join(', ')}`;
+    }
+    return ownerDescription;
+  }, [activeOwners, hasAccountFilter, selectedAccounts]);
   const incomeSourceDescription = bankModeEnabled
     ? activeOwners.length
       ? `${activeOwners.join(', ')} sitt bidrag til felleskonto`
@@ -584,6 +603,17 @@ const FixedExpensesPage = () => {
     : 'netto inntekt';
   const showingDefaultOwnerIncome = !hasManualOwnerSelection && defaultOwners.length > 0;
   const manualFilterActive = hasManualOwnerSelection && activeOwners.length > 0;
+  const filtersActive = manualFilterActive || hasAccountFilter;
+  const filterLabels = useMemo(() => {
+    const labels = [];
+    if (manualFilterActive) {
+      labels.push(activeOwners.join(', '));
+    }
+    if (hasAccountFilter) {
+      labels.push(`konto: ${selectedAccounts.join(', ')}`);
+    }
+    return labels;
+  }, [activeOwners, hasAccountFilter, manualFilterActive, selectedAccounts]);
 
   const handleOpenForm = (expense) => {
     // Hent alltid siste kategorier når skjemaet åpnes
@@ -643,9 +673,22 @@ const FixedExpensesPage = () => {
     [defaultOwners, hasManualOwnerSelection]
   );
 
-  const clearOwnerFilter = useCallback(() => {
+  const handleToggleAccountFilter = useCallback(
+    (account) => {
+      setSelectedAccounts((current) => {
+        if (current.includes(account)) {
+          return current.filter((item) => item !== account);
+        }
+        return [...current, account];
+      });
+    },
+    []
+  );
+
+  const clearFilters = useCallback(() => {
     setSelectedOwners([]);
     setHasManualOwnerSelection(false);
+    setSelectedAccounts([]);
   }, []);
 
   const handleSubmit = async (event) => {
@@ -804,15 +847,15 @@ const FixedExpensesPage = () => {
       <div className="section-header">
         <div>
           <h2>Faste utgifter</h2>
-          {manualFilterActive && (
+          {filtersActive && filterLabels.length > 0 && (
             <div className="filter-indicator">
-              <span className="badge">Filtrert på {activeOwners.join(', ')}</span>
+              <span className="badge">Filtrert på {filterLabels.join(' og ')}</span>
             </div>
           )}
         </div>
         <div className="section-actions">
-          {hasManualOwnerSelection && (
-            <button className="secondary" onClick={clearOwnerFilter}>
+          {filtersActive && (
+            <button className="secondary" onClick={clearFilters}>
               Fjern filter
             </button>
           )}
@@ -844,7 +887,28 @@ const FixedExpensesPage = () => {
           </div>
         </div>
       )}
-        {error && <p className="error-text">{error}</p>}
+      {bankModeEnabled && bankAccounts.length > 0 && (
+        <div className="owner-filter-panel">
+          <div className="owner-filter-panel-header">
+            <p className="muted">
+              Velg hvilke kontoer du vil se utgiftene fra. Kan kombineres med personfilteret over.
+            </p>
+          </div>
+          <div className="chip-list">
+            {bankAccounts.map((account) => (
+              <button
+                type="button"
+                key={account}
+                className={`chip chip-button${selectedAccounts.includes(account) ? ' chip-active' : ''}`}
+                onClick={() => handleToggleAccountFilter(account)}
+              >
+                {account}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {error && <p className="error-text">{error}</p>}
 
       <div className="card-grid">
         <div className="card insight-card glow-lilac">
@@ -852,7 +916,7 @@ const FixedExpensesPage = () => {
           <p className="stat">{formatCurrency(totalPerMonth)}</p>
           <p className="muted">
             {filteredExpenses.length} aktive avtaler
-            {manualFilterActive && ` (av ${expenses.length})`}
+            {filtersActive && ` (av ${expenses.length})`}
             {hiddenCategories.length > 0 && (
               <>
                 <br />
@@ -961,7 +1025,7 @@ const FixedExpensesPage = () => {
         <div className="section-actions" style={{ gap: '0.75rem' }}>
           <span>
             {filteredExpenses.length} avtaler
-            {manualFilterActive && ` (av ${expenses.length})`}
+            {filtersActive && ` (av ${expenses.length})`}
           </span>
           <label className="muted" htmlFor="category-sort">
             Sorter

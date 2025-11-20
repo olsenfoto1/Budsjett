@@ -266,6 +266,9 @@ const SettingsPage = () => {
     setOwnerError('');
     setIsSavingOwners(true);
     try {
+      const activeBankAccounts = bankModeEnabled
+        ? (bankAccounts.length > 0 ? bankAccounts : bankAccountsDraft)
+        : [];
       const payload = Object.entries(ownerInputs)
         .filter(([name]) => name.trim())
         .filter(([, value]) => {
@@ -275,7 +278,11 @@ const SettingsPage = () => {
             income !== '' && income !== null && income !== undefined && String(income).trim() !== '';
           const hasShared =
             shared !== '' && shared !== null && shared !== undefined && String(shared).trim() !== '';
-          return hasIncome || hasShared;
+          const hasBankContribution = activeBankAccounts.some((account) => {
+            const rawValue = value?.bankContributions?.[account];
+            return rawValue !== '' && rawValue !== null && rawValue !== undefined && String(rawValue).trim() !== '';
+          });
+          return hasIncome || hasShared || hasBankContribution;
         })
         .map(([name, value]) => {
           const trimmedName = name.trim();
@@ -284,7 +291,7 @@ const SettingsPage = () => {
             throw new Error(`Beløpet for ${trimmedName} må være et ikke-negativt tall.`);
           }
           const bankContributions = {};
-          bankAccounts.forEach((account) => {
+          activeBankAccounts.forEach((account) => {
             const rawValue = value?.bankContributions?.[account];
             if (rawValue === '' || rawValue === null || rawValue === undefined) return;
             const numeric = Number(rawValue);
@@ -872,7 +879,7 @@ const SettingsPage = () => {
                             />
                           </div>
                         </div>
-                        {bankModeEnabled && (
+                        {bankModeEnabled && bankAccountsDraft.length === 0 && (
                           <div className="owner-income-input">
                             <label className="muted" htmlFor={`owner-shared-${name}`}>
                               Til felleskonto
