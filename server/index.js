@@ -370,6 +370,13 @@ app.put('/api/faste-utgifter/:id', (req, res) => {
   res.json(updated);
 });
 
+app.post('/api/faste-utgifter/:id/reset-price-history', (req, res) => {
+  const { id } = req.params;
+  const updated = db.resetFixedExpensePriceHistory(id);
+  if (!updated) return res.status(404).json({ error: 'Fast utgift ikke funnet' });
+  res.json(updated);
+});
+
 app.delete('/api/faste-utgifter/:id', (req, res) => {
   const { id } = req.params;
   const deleted = db.deleteFixedExpense(id);
@@ -580,6 +587,22 @@ app.get('/api/dashboard', (req, res) => {
     .filter((item) => item.daysLeft >= 0 && item.daysLeft <= 90)
     .sort((a, b) => new Date(a.bindingEndDate) - new Date(b.bindingEndDate));
 
+  const fixedExpensePriceHistory = filteredFixedExpenses
+    .map((expense) => ({
+      id: expense.id,
+      name: expense.name,
+      category: expense.category,
+      color: categoryColorMap[expense.category] || '#94a3b8',
+      priceHistory: (expense.priceHistory || [])
+        .map((entry) => ({
+          amount: Number(entry.amount) || 0,
+          changedAt: entry.changedAt
+        }))
+        .filter((entry) => entry.changedAt)
+        .sort((a, b) => new Date(a.changedAt) - new Date(b.changedAt))
+    }))
+    .filter((item) => item.priceHistory.length > 1);
+
   const monthlyNetIncome = Number(settings.monthlyNetIncome) || 0;
   const ownersHaveCompleteIncome = defaultOwners.every((owner) => ownerIncomeMap.has(owner));
   const ownerIncome = defaultOwners.reduce(
@@ -650,7 +673,8 @@ app.get('/api/dashboard', (req, res) => {
     freeAfterFixed,
     effectiveFixedExpenseTotal,
     bindingExpirations,
-    fixedExpensesCount: fixedExpenses.length
+    fixedExpensesCount: fixedExpenses.length,
+    fixedExpensePriceHistory
   });
 });
 

@@ -7,6 +7,19 @@ import { loadSavingsGoals, summarizeSavingsGoals } from '../utils/savings.js';
 
 ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, PointElement, LineElement, BarElement);
 
+const hexToRgba = (hex, alpha = 0.2) => {
+  if (typeof hex !== 'string') return `rgba(99, 102, 241, ${alpha})`;
+  const normalized = hex.trim().replace('#', '');
+  const expanded = normalized.length === 3 ? normalized.split('').map((char) => char + char).join('') : normalized;
+  if (expanded.length !== 6) return `rgba(99, 102, 241, ${alpha})`;
+  const numeric = Number.parseInt(expanded, 16);
+  if (Number.isNaN(numeric)) return `rgba(99, 102, 241, ${alpha})`;
+  const r = (numeric >> 16) & 255;
+  const g = (numeric >> 8) & 255;
+  const b = numeric & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
 const DashboardPage = () => {
   const [summary, setSummary] = useState(null);
   const [error, setError] = useState('');
@@ -86,6 +99,88 @@ const DashboardPage = () => {
       availableAfterFixed
     };
   });
+
+  const priceTrendItems = summary?.fixedExpensePriceHistory || [];
+
+  const priceTrendLabels = useMemo(() => {
+    const dates = new Set();
+    priceTrendItems.forEach((item) => {
+      (item.priceHistory || []).forEach((entry) => {
+        if (entry.changedAt) {
+          dates.add(entry.changedAt);
+        }
+      });
+    });
+    return Array.from(dates)
+      .sort((a, b) => new Date(a) - new Date(b))
+      .map((value) => ({
+        raw: value,
+        timestamp: new Date(value).getTime(),
+        label: new Date(value).toLocaleDateString('no-NO', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric'
+        })
+      }))
+      .filter((item) => Number.isFinite(item.timestamp));
+  }, [priceTrendItems]);
+
+  const priceTrendChartData = useMemo(() => {
+    if (!priceTrendLabels.length || !priceTrendItems.length) return null;
+    const labelTimestamps = priceTrendLabels.map((item) => item.timestamp);
+    return {
+      labels: priceTrendLabels.map((item) => item.label),
+      datasets: priceTrendItems.map((item) => {
+        const history = (item.priceHistory || [])
+          .map((entry) => ({
+            amount: Number(entry.amount) || 0,
+            timestamp: new Date(entry.changedAt).getTime()
+          }))
+          .filter((entry) => Number.isFinite(entry.timestamp))
+          .sort((a, b) => a.timestamp - b.timestamp);
+        let pointer = 0;
+        let currentAmount = history[0]?.amount ?? 0;
+        const points = labelTimestamps.map((ts) => {
+          while (pointer < history.length && history[pointer].timestamp <= ts) {
+            currentAmount = history[pointer].amount;
+            pointer += 1;
+          }
+          return currentAmount;
+        });
+        const color = item.color || '#6366f1';
+        return {
+          label: item.name,
+          data: points,
+          borderColor: color,
+          backgroundColor: hexToRgba(color, 0.2),
+          tension: 0.25
+        };
+      })
+    };
+  }, [priceTrendLabels, priceTrendItems]);
+
+  const priceTrendChartOptions = useMemo(
+    () => ({
+      responsive: true,
+      interaction: { mode: 'nearest', intersect: false },
+      plugins: {
+        legend: { position: 'bottom' },
+        tooltip: {
+          callbacks: {
+            label: (context) => `${context.dataset.label}: ${formatCurrency(context.parsed.y)}`
+          }
+        }
+      },
+      scales: {
+        y: {
+          ticks: {
+            callback: (value) => formatCurrency(value)
+          }
+        }
+      }
+    }),
+    []
+  );
 
   const lineData = {
     labels: monthlyForecast.map((item) => item.label),
@@ -265,6 +360,25 @@ const DashboardPage = () => {
             </div>
           ))}
         </div>
+      </div>
+
+      <div className="card insight-card glow-indigo chart-card">
+        <div className="section-header" style={{ marginTop: 0 }}>
+          <div>
+            <h2>Prisendringer i faste utgifter</h2>
+            <p className="muted">Historikk for utgifter som er oppdatert med ny pris.</p>
+          </div>
+          {priceTrendItems.length > 0 && (
+            <span className="badge">{priceTrendItems.length} utgifter</span>
+          )}
+        </div>
+        {priceTrendChartData ? (
+          <div className="chart-wrapper">
+            <Line data={priceTrendChartData} options={priceTrendChartOptions} />
+          </div>
+        ) : (
+          <p className="muted">Ingen prisendringer registrert ennå.</p>
+        )}
       </div>
 
       <div className="card insight-card glow-sand">

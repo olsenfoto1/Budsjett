@@ -145,6 +145,24 @@ class Store {
 
     const now = new Date().toISOString();
     const amount = Number(raw.amountPerMonth ?? raw.beløp_per_mnd ?? raw.amount_per_mnd ?? raw.amount ?? 0) || 0;
+    const priceHistory = Array.isArray(raw.priceHistory)
+      ? raw.priceHistory
+          .map((entry) => ({
+            amount: Number(entry?.amount ?? entry?.price ?? entry?.beløp ?? entry?.value),
+            changedAt: entry?.changedAt || entry?.date || entry?.timestamp
+          }))
+          .filter((entry) => Number.isFinite(entry.amount) && entry.changedAt)
+          .sort((a, b) => new Date(a.changedAt) - new Date(b.changedAt))
+      : [];
+    const lastChanged = raw.updatedAt || raw.createdAt || now;
+    if (!priceHistory.length) {
+      priceHistory.push({ amount, changedAt: lastChanged });
+    } else {
+      const latest = priceHistory[priceHistory.length - 1];
+      if (latest.amount !== amount) {
+        priceHistory.push({ amount, changedAt: lastChanged });
+      }
+    }
     const notice = raw.noticePeriodMonths ?? raw.oppsigelsestid_mnd;
     return {
       id: raw.id ?? fallbackId,
@@ -159,7 +177,8 @@ class Store {
         notice === null || notice === undefined || notice === '' ? null : Number(notice) || 0,
       note: raw.note || raw.notat || '',
       createdAt: raw.createdAt || now,
-      updatedAt: raw.updatedAt || now
+      updatedAt: raw.updatedAt || now,
+      priceHistory
     };
   }
 
@@ -377,7 +396,10 @@ class Store {
           : Number(payload.noticePeriodMonths) || 0,
       note: payload.note || '',
       createdAt: payload.createdAt || now,
-      updatedAt: payload.updatedAt || now
+      updatedAt: payload.updatedAt || now,
+      priceHistory: Array.isArray(payload.priceHistory) && payload.priceHistory.length
+        ? payload.priceHistory
+        : [{ amount: Number(payload.amountPerMonth) || 0, changedAt: now }]
     };
     this.state.fixedExpenses.push(expense);
     this.save();
@@ -419,31 +441,65 @@ class Store {
     const index = this.state.fixedExpenses.findIndex((exp) => exp.id === Number(id));
     if (index === -1) return null;
     const current = this.state.fixedExpenses[index];
+    const now = new Date().toISOString();
     const owners =
       payload.owners === undefined
         ? current.owners
         : Array.isArray(payload.owners)
         ? payload.owners.map((owner) => owner.trim()).filter(Boolean)
         : [];
+    const nextAmount =
+      payload.amountPerMonth !== undefined
+        ? Number(payload.amountPerMonth) || 0
+        : current.amountPerMonth;
+    let priceHistory = Array.isArray(current.priceHistory) ? [...current.priceHistory] : [];
+    if (payload.resetPriceHistory) {
+      priceHistory = [{ amount: nextAmount, changedAt: now }];
+    } else if (!priceHistory.length) {
+      priceHistory = [{ amount: nextAmount, changedAt: now }];
+    } else {
+      const latest = priceHistory[priceHistory.length - 1];
+      if (latest.amount !== nextAmount) {
+        priceHistory = [...priceHistory, { amount: nextAmount, changedAt: now }];
+      }
+    }
     const updated = {
       ...current,
       ...payload,
       owners,
-      amountPerMonth:
-        payload.amountPerMonth !== undefined
-          ? Number(payload.amountPerMonth) || 0
-          : current.amountPerMonth,
+      amountPerMonth: nextAmount,
       noticePeriodMonths:
         payload.noticePeriodMonths === undefined
           ? current.noticePeriodMonths
           : payload.noticePeriodMonths === null || payload.noticePeriodMonths === ''
           ? null
           : Number(payload.noticePeriodMonths) || 0,
-      updatedAt: new Date().toISOString()
+      updatedAt: now,
+      priceHistory
     };
     this.state.fixedExpenses[index] = updated;
     this.save();
     return updated;
+  }
+
+  resetFixedExpensePriceHistory(id) {
+    const index = this.state.fixedExpenses.findIndex((exp) => exp.id === Number(id));
+    if (index === -1) return null;
+    const now = new Date().toISOString();
+    const expense = this.state.fixedExpenses[index];
+    const reset = {
+      ...expense,
+      priceHistory: [
+        {
+          amount: Number(expense.amountPerMonth) || 0,
+          changedAt: now
+        }
+      ],
+      updatedAt: now
+    };
+    this.state.fixedExpenses[index] = reset;
+    this.save();
+    return reset;
   }
 
   deleteFixedExpense(id) {

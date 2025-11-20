@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
-import { Doughnut } from 'react-chartjs-2';
+import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, PointElement, LineElement } from 'chart.js';
+import { Doughnut, Line } from 'react-chartjs-2';
 import { api } from '../api.js';
 import { formatCurrency, formatDate, formatNotice } from '../utils/format.js';
 
-ChartJS.register(ArcElement, Tooltip, Legend);
+ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, PointElement, LineElement);
 
 const FALLBACK_CATEGORY_OPTIONS = ['Abonnementer', 'Lån', 'Forsikring', 'Strøm', 'Annet'];
 const FALLBACK_CATEGORY_COLORS = {
@@ -122,6 +122,10 @@ const FixedExpensesPage = () => {
     const stored = localStorage.getItem(CATEGORY_SORT_STORAGE_KEY);
     return CATEGORY_SORT_OPTIONS.some((option) => option.value === stored) ? stored : 'total-desc';
   });
+  const [priceInputs, setPriceInputs] = useState({});
+  const [priceErrors, setPriceErrors] = useState({});
+  const [isUpdatingPriceId, setIsUpdatingPriceId] = useState(null);
+  const [isResettingPriceId, setIsResettingPriceId] = useState(null);
   const ownerOptions = useMemo(() => {
     const set = new Set();
     expenses.forEach((expense) => {
@@ -332,6 +336,95 @@ const FixedExpensesPage = () => {
       .sort((a, b) => new Date(a.bindingEndDate) - new Date(b.bindingEndDate));
   }, [filteredExpenses]);
 
+  const priceTrendExpenses = useMemo(
+    () =>
+      filteredExpenses.filter(
+        (expense) => (expense.priceHistory || []).length > 1 && !hiddenCategorySet.has(expense.category)
+      ),
+    [filteredExpenses, hiddenCategorySet]
+  );
+
+  const priceTrendLabels = useMemo(() => {
+    const dates = new Set();
+    priceTrendExpenses.forEach((expense) => {
+      (expense.priceHistory || []).forEach((entry) => {
+        if (entry.changedAt) {
+          dates.add(entry.changedAt);
+        }
+      });
+    });
+    return Array.from(dates)
+      .sort((a, b) => new Date(a) - new Date(b))
+      .map((value) => ({
+        raw: value,
+        timestamp: new Date(value).getTime(),
+        label: new Date(value).toLocaleDateString('no-NO', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric'
+        })
+      }))
+      .filter((item) => Number.isFinite(item.timestamp));
+  }, [priceTrendExpenses]);
+
+  const priceTrendChartData = useMemo(() => {
+    if (!priceTrendLabels.length || !priceTrendExpenses.length) return null;
+    const labelTimestamps = priceTrendLabels.map((item) => item.timestamp);
+    return {
+      labels: priceTrendLabels.map((item) => item.label),
+      datasets: priceTrendExpenses.map((expense) => {
+        const sortedHistory = (expense.priceHistory || [])
+          .map((entry) => ({
+            amount: Number(entry.amount) || 0,
+            timestamp: new Date(entry.changedAt).getTime()
+          }))
+          .filter((entry) => Number.isFinite(entry.timestamp))
+          .sort((a, b) => a.timestamp - b.timestamp);
+        let pointer = 0;
+        let currentAmount = sortedHistory[0]?.amount ?? 0;
+        const points = labelTimestamps.map((labelTs) => {
+          while (pointer < sortedHistory.length && sortedHistory[pointer].timestamp <= labelTs) {
+            currentAmount = sortedHistory[pointer].amount;
+            pointer += 1;
+          }
+          return currentAmount;
+        });
+        const color =
+          categoryColorMap[expense.category] || FALLBACK_CATEGORY_COLORS[expense.category] || '#4f46e5';
+        return {
+          label: expense.name,
+          data: points,
+          borderColor: color,
+          backgroundColor: hexToRgba(color, 0.2),
+          tension: 0.25
+        };
+      })
+    };
+  }, [priceTrendLabels, priceTrendExpenses, categoryColorMap]);
+
+  const priceTrendChartOptions = useMemo(
+    () => ({
+      responsive: true,
+      interaction: { mode: 'nearest', intersect: false },
+      plugins: {
+        legend: { position: 'bottom' },
+        tooltip: {
+          callbacks: {
+            label: (context) => `${context.dataset.label}: ${formatCurrency(context.parsed.y)}`
+          }
+        }
+      },
+      scales: {
+        y: {
+          ticks: {
+            callback: (value) => formatCurrency(value)
+          }
+        }
+      }
+    }),
+    []
+  );
+
   useEffect(() => {
     setHiddenCategories((current) => current.filter((category) => categoryTotals.some((item) => item.category === category)));
   }, [categoryTotals]);
@@ -530,6 +623,60 @@ const FixedExpensesPage = () => {
       setIsBulkUpdatingOwners(false);
     }
   };
+
+  const handleNewPriceChange = useCallback(
+    (id, value) => {
+      setPriceInputs((current) => ({ ...current, [id]: value }));
+      if (priceErrors[id]) {
+        setPriceErrors((current) => ({ ...current, [id]: '' }));
+      }
+    },
+    [priceErrors]
+  );
+
+  const handleSubmitNewPrice = useCallback(
+    async (expense) => {
+      const rawValue = priceInputs[expense.id];
+      const nextAmount = Number(rawValue);
+      if (!Number.isFinite(nextAmount) || nextAmount < 0) {
+        setPriceErrors((current) => ({ ...current, [expense.id]: 'Skriv inn en gyldig pris.' }));
+        return;
+      }
+      if (nextAmount === expense.amountPerMonth) {
+        setPriceErrors((current) => ({ ...current, [expense.id]: 'Prisen er uendret.' }));
+        return;
+      }
+      try {
+        setIsUpdatingPriceId(expense.id);
+        await api.updateFixedExpense(expense.id, { amountPerMonth: nextAmount });
+        setPriceErrors((current) => ({ ...current, [expense.id]: '' }));
+        setPriceInputs((current) => ({ ...current, [expense.id]: '' }));
+        fetchExpenses();
+      } catch (err) {
+        setPriceErrors((current) => ({ ...current, [expense.id]: err.message }));
+      } finally {
+        setIsUpdatingPriceId(null);
+      }
+    },
+    [priceInputs, fetchExpenses]
+  );
+
+  const handleResetPriceHistory = useCallback(
+    async (expense) => {
+      try {
+        setIsResettingPriceId(expense.id);
+        await api.resetFixedExpensePriceHistory(expense.id);
+        setPriceErrors((current) => ({ ...current, [expense.id]: '' }));
+        setPriceInputs((current) => ({ ...current, [expense.id]: '' }));
+        fetchExpenses();
+      } catch (err) {
+        setPriceErrors((current) => ({ ...current, [expense.id]: err.message }));
+      } finally {
+        setIsResettingPriceId(null);
+      }
+    },
+    [fetchExpenses]
+  );
 
   const simulation = useMemo(() => {
     if (!simulatedExpense) return null;
@@ -804,6 +951,38 @@ const FixedExpensesPage = () => {
                           <strong>{formatCurrency(expense.amountPerMonth)}</strong>
                         </div>
                       </div>
+                      <div className="price-adjustment">
+                        <label className="muted" htmlFor={`new-price-${expense.id}`}>
+                          Ny pris
+                        </label>
+                        <div className="inline-form">
+                          <input
+                            id={`new-price-${expense.id}`}
+                            type="number"
+                            min="0"
+                            step="1"
+                            placeholder="Oppgi ny pris"
+                            value={priceInputs[expense.id] ?? ''}
+                            onChange={(event) => handleNewPriceChange(expense.id, event.target.value)}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleSubmitNewPrice(expense)}
+                            disabled={isUpdatingPriceId === expense.id}
+                          >
+                            {isUpdatingPriceId === expense.id ? 'Lagrer…' : 'Oppdater pris'}
+                          </button>
+                          <button
+                            type="button"
+                            className="secondary"
+                            onClick={() => handleResetPriceHistory(expense)}
+                            disabled={isResettingPriceId === expense.id}
+                          >
+                            {isResettingPriceId === expense.id ? 'Resetter…' : 'Tilbakestill historikk'}
+                          </button>
+                        </div>
+                        {priceErrors[expense.id] && <p className="error-text">{priceErrors[expense.id]}</p>}
+                      </div>
                       <div className="expense-actions">
                         <button className="secondary" onClick={() => setSimulatedExpense(expense)}>
                           Simuler oppsigelse
@@ -846,6 +1025,26 @@ const FixedExpensesPage = () => {
           </button>
         </form>
         {bulkOwnersError && <p className="error-text">{bulkOwnersError}</p>}
+      </div>
+
+      <div className="card insight-card glow-indigo chart-card">
+        <div className="section-header" style={{ marginTop: 0 }}>
+          <div>
+            <h2>Prisendringer for faste utgifter</h2>
+            <p className="muted">
+              Registrer en «Ny pris» på en utgift for å følge utviklingen over tid. Du kan tilbakestille
+              historikken for hver utgift dersom noe ble feil.
+            </p>
+          </div>
+          {priceTrendExpenses.length > 0 && <span className="badge">{priceTrendExpenses.length} utgifter</span>}
+        </div>
+        {priceTrendChartData ? (
+          <div className="chart-wrapper">
+            <Line data={priceTrendChartData} options={priceTrendChartOptions} />
+          </div>
+        ) : (
+          <p className="muted">Ingen prisendringer registrert ennå.</p>
+        )}
       </div>
 
       {showForm && (

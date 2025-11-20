@@ -31,6 +31,8 @@ export const api = {
   deleteFixedExpense: (id) => request(`/faste-utgifter/${id}`, { method: 'DELETE' }),
   bulkAddOwnersToFixedExpenses: (owners) =>
     request('/faste-utgifter/bulk-owners', { method: 'POST', body: JSON.stringify({ owners }) }),
+  resetFixedExpensePriceHistory: (id) =>
+    request(`/faste-utgifter/${id}/reset-price-history`, { method: 'POST' }),
 
   getCategories: () => request('/categories'),
   createCategory: (payload) => request('/categories', { method: 'POST', body: JSON.stringify(payload) }),
