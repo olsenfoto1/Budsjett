@@ -16,6 +16,12 @@ const FALLBACK_CATEGORY_COLORS = {
   Annet: '#94a3b8'
 };
 const LEVEL_OPTIONS = ['Må-ha', 'Kjekt å ha', 'Luksus'];
+const CATEGORY_SORT_STORAGE_KEY = 'fixed-expense-category-sort';
+const CATEGORY_SORT_OPTIONS = [
+  { value: 'total-desc', label: 'Størst sum' },
+  { value: 'total-asc', label: 'Lavest sum' },
+  { value: 'alpha-asc', label: 'Alfabetisk' }
+];
 
 const hexToRgba = (hex, alpha = 1) => {
   if (typeof hex !== 'string') return `rgba(148, 163, 184, ${alpha})`;
@@ -111,6 +117,10 @@ const FixedExpensesPage = () => {
   const [settingsError, setSettingsError] = useState('');
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [defaultOwners, setDefaultOwners] = useState([]);
+  const [categorySort, setCategorySort] = useState(() => {
+    const stored = localStorage.getItem(CATEGORY_SORT_STORAGE_KEY);
+    return CATEGORY_SORT_OPTIONS.some((option) => option.value === stored) ? stored : 'total-desc';
+  });
   const ownerOptions = useMemo(() => {
     const set = new Set();
     expenses.forEach((expense) => {
@@ -290,8 +300,20 @@ const FixedExpensesPage = () => {
         items: items.sort((a, b) => (b.amountPerMonth || 0) - (a.amountPerMonth || 0)),
         total: items.reduce((sum, item) => sum + (Number(item.amountPerMonth) || 0), 0)
       }))
-      .sort((a, b) => b.total - a.total);
-  }, [filteredExpenses]);
+      .sort((a, b) => {
+        if (categorySort === 'alpha-asc') {
+          return a.category.localeCompare(b.category, 'nb');
+        }
+        if (categorySort === 'total-asc') {
+          return (a.total || 0) - (b.total || 0);
+        }
+        return (b.total || 0) - (a.total || 0);
+      });
+  }, [filteredExpenses, categorySort]);
+
+  useEffect(() => {
+    localStorage.setItem(CATEGORY_SORT_STORAGE_KEY, categorySort);
+  }, [categorySort]);
 
   const bindingSoon = useMemo(() => {
     const now = Date.now();
@@ -681,10 +703,26 @@ const FixedExpensesPage = () => {
 
       <div className="section-header">
         <h2>Alle faste utgifter</h2>
-        <span>
-          {filteredExpenses.length} avtaler
-          {manualFilterActive && ` (av ${expenses.length})`}
-        </span>
+        <div className="section-actions" style={{ gap: '0.75rem' }}>
+          <span>
+            {filteredExpenses.length} avtaler
+            {manualFilterActive && ` (av ${expenses.length})`}
+          </span>
+          <label className="muted" htmlFor="category-sort">
+            Sorter
+          </label>
+          <select
+            id="category-sort"
+            value={categorySort}
+            onChange={(event) => setCategorySort(event.target.value)}
+          >
+            {CATEGORY_SORT_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
       <div className="category-sections">
         {groupedExpenses.length === 0 && <p className="muted">Ingen registrerte utgifter ennå.</p>}
