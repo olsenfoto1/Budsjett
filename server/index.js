@@ -124,6 +124,15 @@ const invalidateLockTokens = () => {
   activeLockTokens.clear();
 };
 
+const invalidateLockTokensForUser = (userId) => {
+  if (!userId) return;
+  for (const [token, meta] of activeLockTokens.entries()) {
+    if (meta.user && meta.user.id === userId) {
+      activeLockTokens.delete(token);
+    }
+  }
+};
+
 app.use((req, res, next) => {
   if (!req.path.startsWith('/api')) return next();
   if (!isLockEnabled()) return next();
@@ -258,6 +267,7 @@ app.delete('/api/sharing/users/:id', (req, res) => {
   if (!deleted) {
     return res.status(404).json({ error: 'Fant ikke brukeren du ville slette.' });
   }
+  invalidateLockTokensForUser(id);
   res.json({ deleted: true, users: db.listSharedUsers() });
 });
 
@@ -515,7 +525,7 @@ app.get('/api/settings', (req, res) => {
 });
 
 app.put('/api/settings', (req, res) => {
-  const {
+  const {   
     monthlyNetIncome,
     ownerProfiles,
     defaultFixedExpensesOwner,
@@ -529,6 +539,7 @@ app.put('/api/settings', (req, res) => {
   } = req.body || {};
   const update = {};
   const currentlyLocked = isLockEnabled();
+  const activeUser = getActiveUser(req);
   let shouldInvalidateLockSessions = false;
   const currentSettings = db.getSettings();
   const currentBankAccounts = Array.isArray(currentSettings.bankAccounts)
@@ -711,7 +722,7 @@ app.put('/api/settings', (req, res) => {
   if (shouldInvalidateLockSessions) {
     invalidateLockTokens();
     if (sanitizedSettings.lockEnabled) {
-      issueLockToken(res);
+      issueLockToken(res, activeUser);
     } else {
       res.clearCookie(LOCK_COOKIE_NAME);
       res.clearCookie(USER_COOKIE_NAME);
