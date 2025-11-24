@@ -730,6 +730,109 @@ class Store {
     return this.state.settings;
   }
 
+  renameBankAccount(fromName, toName) {
+    const from = typeof fromName === 'string' ? fromName.trim() : '';
+    const to = typeof toName === 'string' ? toName.trim() : '';
+
+    if (!from || !to || from === to) {
+      return {
+        changed: false,
+        bankAccounts: this.state.settings.bankAccounts,
+        defaultFixedExpensesBankAccount: this.state.settings.defaultFixedExpensesBankAccount,
+        ownerProfiles: this.state.settings.ownerProfiles,
+        fixedExpenses: this.state.fixedExpenses
+      };
+    }
+
+    const accounts = this.normalizeBankAccounts(this.state.settings.bankAccounts || []);
+    const fromIndex = accounts.indexOf(from);
+    if (fromIndex === -1) {
+      return {
+        changed: false,
+        bankAccounts: accounts,
+        defaultFixedExpensesBankAccount: this.state.settings.defaultFixedExpensesBankAccount,
+        ownerProfiles: this.state.settings.ownerProfiles,
+        fixedExpenses: this.state.fixedExpenses
+      };
+    }
+
+    const duplicate = accounts.some(
+      (account, index) => index !== fromIndex && account.toLowerCase() === to.toLowerCase()
+    );
+    if (duplicate) {
+      return {
+        changed: false,
+        bankAccounts: accounts,
+        defaultFixedExpensesBankAccount: this.state.settings.defaultFixedExpensesBankAccount,
+        ownerProfiles: this.state.settings.ownerProfiles,
+        fixedExpenses: this.state.fixedExpenses,
+        error: 'exists'
+      };
+    }
+
+    const now = new Date().toISOString();
+    let changed = false;
+
+    const renamedAccounts = accounts.map((account) => (account === from ? to : account));
+    this.state.settings.bankAccounts = this.normalizeBankAccounts(renamedAccounts);
+    changed = changed || renamedAccounts.join('|') !== accounts.join('|');
+
+    if (this.state.settings.defaultFixedExpensesBankAccount === from) {
+      this.state.settings.defaultFixedExpensesBankAccount = to;
+      changed = true;
+    }
+
+    this.state.fixedExpenses = this.state.fixedExpenses.map((expense) => {
+      if (expense.account !== from) return expense;
+      changed = true;
+      return { ...expense, account: to, updatedAt: now };
+    });
+
+    const validAccounts = new Set(this.state.settings.bankAccounts);
+    this.state.settings.ownerProfiles = (this.state.settings.ownerProfiles || []).map((profile) => {
+      if (!profile) return profile;
+      const contributions = {};
+      Object.entries(profile.bankContributions || {}).forEach(([account, value]) => {
+        const key = account === from ? to : account;
+        if (!validAccounts.has(key)) return;
+        contributions[key] = value;
+      });
+      const totalContribution = Object.values(contributions).reduce(
+        (sum, value) => sum + (Number.isFinite(value) ? Number(value) : 0),
+        0
+      );
+      const sharedContribution = totalContribution > 0 ? totalContribution : profile.sharedContribution;
+      if (
+        JSON.stringify(contributions) !== JSON.stringify(profile.bankContributions || {}) ||
+        sharedContribution !== profile.sharedContribution
+      ) {
+        changed = true;
+      }
+      return {
+        ...profile,
+        bankContributions: contributions,
+        sharedContribution
+      };
+    });
+
+    if (!validAccounts.has(this.state.settings.defaultFixedExpensesBankAccount)) {
+      this.state.settings.defaultFixedExpensesBankAccount = '';
+      changed = true;
+    }
+
+    if (changed) {
+      this.save();
+    }
+
+    return {
+      changed,
+      bankAccounts: this.state.settings.bankAccounts,
+      defaultFixedExpensesBankAccount: this.state.settings.defaultFixedExpensesBankAccount,
+      ownerProfiles: this.state.settings.ownerProfiles,
+      fixedExpenses: this.state.fixedExpenses
+    };
+  }
+
   renameOwner(fromName, toName) {
     const from = typeof fromName === 'string' ? fromName.trim() : '';
     const to = typeof toName === 'string' ? toName.trim() : '';

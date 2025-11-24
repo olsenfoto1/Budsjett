@@ -598,6 +598,42 @@ app.put('/api/settings', (req, res) => {
   res.json(sanitizedSettings);
 });
 
+app.post('/api/bank-accounts/rename', (req, res) => {
+  const from = normalizeName(req.body.from ?? req.body.oldName);
+  const to = normalizeName(req.body.to ?? req.body.newName);
+
+  if (!from || !to) {
+    return res.status(400).json({ error: 'Både gammelt og nytt kontonavn må fylles ut.' });
+  }
+  if (from === to) {
+    return res.status(400).json({ error: 'Kontonavnet er uendret.' });
+  }
+
+  const { bankAccounts = [] } = db.getSettings();
+  const exists = bankAccounts.includes(from);
+  if (!exists) {
+    return res.status(404).json({ error: 'Fant ikke kontoen du ville oppdatere.' });
+  }
+  const duplicate = bankAccounts.some(
+    (account) => account !== from && account.toLowerCase() === to.toLowerCase()
+  );
+  if (duplicate) {
+    return res.status(400).json({ error: 'Det finnes allerede en konto med dette navnet.' });
+  }
+
+  const result = db.renameBankAccount(from, to);
+  if (!result.changed) {
+    return res.status(400).json({ error: 'Kunne ikke oppdatere kontonavnet.' });
+  }
+
+  res.json({
+    bankAccounts: result.bankAccounts,
+    defaultFixedExpensesBankAccount: result.defaultFixedExpensesBankAccount,
+    ownerProfiles: result.ownerProfiles,
+    fixedExpenses: result.fixedExpenses
+  });
+});
+
 app.get('/api/dashboard', (req, res) => {
   const transactions = db.getTransactions();
   const categories = db.getCategories();

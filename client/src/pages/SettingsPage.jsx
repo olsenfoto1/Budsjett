@@ -42,6 +42,9 @@ const SettingsPage = () => {
   const [bankAccountStatus, setBankAccountStatus] = useState('');
   const [bankAccountError, setBankAccountError] = useState('');
   const [isSavingBankAccounts, setIsSavingBankAccounts] = useState(false);
+  const [editingBankAccount, setEditingBankAccount] = useState('');
+  const [editedBankAccountName, setEditedBankAccountName] = useState('');
+  const [bankAccountActionLoading, setBankAccountActionLoading] = useState('');
 
   useEffect(() => {
     let isMounted = true;
@@ -226,6 +229,7 @@ const SettingsPage = () => {
     event.preventDefault();
     setBankAccountStatus('');
     setBankAccountError('');
+    setBankAccountActionLoading('');
     const trimmed = newBankAccount.trim();
     if (!trimmed) {
       setBankAccountError('Skriv inn et kontonavn.');
@@ -241,12 +245,22 @@ const SettingsPage = () => {
 
   const handleRemoveBankAccount = (account) => {
     setBankAccountsDraft((current) => current.filter((item) => item !== account));
+    if (editingBankAccount === account) {
+      setEditingBankAccount('');
+      setEditedBankAccountName('');
+    }
+    if (defaultAccount === account) {
+      setDefaultAccount('');
+    }
   };
 
   const handleSaveBankAccounts = async () => {
     setBankAccountStatus('');
     setBankAccountError('');
     setIsSavingBankAccounts(true);
+    setBankAccountActionLoading('');
+    setEditingBankAccount('');
+    setEditedBankAccountName('');
     try {
       const sanitized = Array.from(new Set(bankAccountsDraft.map((account) => account.trim()).filter(Boolean)));
       const updated = await api.updateSettings({ bankAccounts: sanitized });
@@ -262,10 +276,82 @@ const SettingsPage = () => {
     }
   };
 
+  const handleStartRenameBankAccount = (account) => {
+    setBankAccountStatus('');
+    setBankAccountError('');
+    setBankAccountActionLoading('');
+    setEditingBankAccount(account);
+    setEditedBankAccountName(account);
+  };
+
+  const handleConfirmRenameBankAccount = async () => {
+    setBankAccountStatus('');
+    setBankAccountError('');
+    const trimmed = editedBankAccountName.trim();
+
+    if (!editingBankAccount) return;
+    if (!trimmed) {
+      setBankAccountError('Skriv inn et nytt kontonavn.');
+      return;
+    }
+    if (trimmed === editingBankAccount) {
+      setBankAccountError('Kontonavnet er uendret.');
+      return;
+    }
+    const exists = bankAccountsDraft.some(
+      (account) => account !== editingBankAccount && account.toLowerCase() === trimmed.toLowerCase()
+    );
+    if (exists) {
+      setBankAccountError('Det finnes allerede en konto med dette navnet.');
+      return;
+    }
+
+    setBankAccountActionLoading(editingBankAccount);
+
+    if (bankAccounts.includes(editingBankAccount)) {
+      try {
+        const result = await api.renameBankAccount(editingBankAccount, trimmed);
+        const nextAccounts = Array.isArray(result.bankAccounts) ? result.bankAccounts : bankAccountsDraft;
+        setBankAccounts(nextAccounts);
+        setBankAccountsDraft(nextAccounts);
+        syncOwnerBankContributions(nextAccounts);
+        setDefaultAccount(
+          typeof result.defaultFixedExpensesBankAccount === 'string'
+            ? result.defaultFixedExpensesBankAccount.trim()
+            : ''
+        );
+        syncOwnersFromPayload(result);
+        setBankAccountStatus(`Kontonavn oppdatert til ${trimmed}.`);
+      } catch (err) {
+        setBankAccountError(err.message || 'Kunne ikke endre kontonavnet.');
+      } finally {
+        setBankAccountActionLoading('');
+        setEditingBankAccount('');
+        setEditedBankAccountName('');
+      }
+      return;
+    }
+
+    const updatedDraft = bankAccountsDraft.map((account) =>
+      account === editingBankAccount ? trimmed : account
+    );
+    setBankAccountsDraft(updatedDraft);
+    syncOwnerBankContributions(updatedDraft);
+    if (defaultAccount === editingBankAccount) {
+      setDefaultAccount(trimmed);
+    }
+    setBankAccountStatus(`Kontonavn oppdatert til ${trimmed}.`);
+    setBankAccountActionLoading('');
+    setEditingBankAccount('');
+    setEditedBankAccountName('');
+  };
+
   const handleClearBankAccounts = async () => {
     setBankAccountStatus('');
     setBankAccountError('');
     setIsSavingBankAccounts(true);
+    setEditingBankAccount('');
+    setEditedBankAccountName('');
     try {
       const updated = await api.updateSettings({
         bankAccounts: [],
@@ -281,6 +367,7 @@ const SettingsPage = () => {
       setBankAccountError(err.message || 'Kunne ikke slette kontoene.');
     } finally {
       setIsSavingBankAccounts(false);
+      setBankAccountActionLoading('');
     }
   };
 
@@ -810,22 +897,67 @@ const SettingsPage = () => {
                     Kontoene vises som valg i Faste utgifter. Fjern en konto for å rydde opp i listen.
                   </p>
                 </div>
-                <div className="bank-account-list">
-                  {bankAccountsDraft.length === 0 && <p className="muted">Ingen kontoer lagt til ennå.</p>}
-                  {bankAccountsDraft.map((account) => (
-                    <div key={account} className="bank-account-row">
-                      <span className="bank-account-name">{account}</span>
-                      <button
-                        type="button"
-                        className="ghost"
-                        onClick={() => handleRemoveBankAccount(account)}
-                        disabled={isSavingBankAccounts}
-                      >
-                        Fjern
-                      </button>
+              <div className="bank-account-list">
+                {bankAccountsDraft.length === 0 && <p className="muted">Ingen kontoer lagt til ennå.</p>}
+                {bankAccountsDraft.map((account) => (
+                  <div key={account} className="bank-account-row">
+                    <div className="bank-account-name">
+                      {editingBankAccount === account ? (
+                        <input
+                          value={editedBankAccountName}
+                          onChange={(e) => setEditedBankAccountName(e.target.value)}
+                          placeholder="Nytt kontonavn"
+                        />
+                      ) : (
+                        <span>{account}</span>
+                      )}
                     </div>
-                  ))}
-                </div>
+                    <div className="bank-account-actions">
+                      {editingBankAccount === account ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={handleConfirmRenameBankAccount}
+                            disabled={bankAccountActionLoading === account || isSavingBankAccounts}
+                          >
+                            {bankAccountActionLoading === account ? 'Lagrer…' : 'Lagre navn'}
+                          </button>
+                          <button
+                            type="button"
+                            className="ghost"
+                            onClick={() => {
+                              setEditingBankAccount('');
+                              setEditedBankAccountName('');
+                            }}
+                            disabled={bankAccountActionLoading === account || isSavingBankAccounts}
+                          >
+                            Avbryt
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            className="ghost"
+                            onClick={() => handleStartRenameBankAccount(account)}
+                            disabled={isSavingBankAccounts}
+                          >
+                            Endre navn
+                          </button>
+                          <button
+                            type="button"
+                            className="ghost"
+                            onClick={() => handleRemoveBankAccount(account)}
+                            disabled={isSavingBankAccounts}
+                          >
+                            Fjern
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
                 {bankAccountsDraft.length > 0 && (
                   <div className="settings-actions" style={{ marginTop: '0.5rem' }}>
                     <button
