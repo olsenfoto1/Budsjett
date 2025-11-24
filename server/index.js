@@ -120,6 +120,22 @@ const issueLockToken = (res, user = null) => {
   return token;
 };
 
+const getActiveUserContext = (req) => {
+  const user = getActiveUser(req);
+  const lockEnabled = isLockEnabled();
+  const isAdmin = !lockEnabled || user?.id === 'admin';
+  return { user, lockEnabled, isAdmin };
+};
+
+const enforceAdmin = (req, res) => {
+  const { isAdmin, lockEnabled } = getActiveUserContext(req);
+  if (lockEnabled && !isAdmin) {
+    res.status(403).json({ error: 'Denne handlingen er bare tilgjengelig for administrator.' });
+    return false;
+  }
+  return true;
+};
+
 const invalidateLockTokens = () => {
   activeLockTokens.clear();
 };
@@ -169,6 +185,16 @@ const normalizeOwnersInput = (owners) => {
 };
 
 const normalizeName = (value) => (typeof value === 'string' ? value.trim() : '');
+
+const filterExpensesForUser = (expenses, user) => {
+  const name = user?.name?.toLowerCase();
+  if (!name) return expenses;
+  return expenses.filter((expense) =>
+    Array.isArray(expense.owners)
+      ? expense.owners.some((owner) => owner && owner.toLowerCase() === name)
+      : false
+  );
+};
 
 app.get('/api/lock/status', (req, res) => {
   const enabled = isLockEnabled();
@@ -339,6 +365,7 @@ app.delete('/api/pages/:id', (req, res) => {
 });
 
 app.get('/api/transactions', (req, res) => {
+  if (!enforceAdmin(req, res)) return;
   const { type, categoryId, tag, pageId, search, sortBy = 'occurredOn', order = 'DESC' } = req.query;
   let transactions = [...db.getTransactions()];
 
@@ -368,6 +395,7 @@ app.get('/api/transactions', (req, res) => {
 });
 
 app.post('/api/transactions', (req, res) => {
+  if (!enforceAdmin(req, res)) return;
   const {
     title,
     amount,
@@ -397,6 +425,7 @@ app.post('/api/transactions', (req, res) => {
 });
 
 app.put('/api/transactions/:id', (req, res) => {
+  if (!enforceAdmin(req, res)) return;
   const { id } = req.params;
   const updated = db.updateTransaction(id, {
     ...req.body,
@@ -408,21 +437,29 @@ app.put('/api/transactions/:id', (req, res) => {
 });
 
 app.delete('/api/transactions/:id', (req, res) => {
+  if (!enforceAdmin(req, res)) return;
   const { id } = req.params;
   const removed = db.deleteTransaction(id);
   res.json({ deleted: removed });
 });
 
 app.delete('/api/transactions', (req, res) => {
+  if (!enforceAdmin(req, res)) return;
   const deleted = db.clearTransactions();
   res.json({ deleted });
 });
 
 app.get('/api/faste-utgifter', (req, res) => {
-  res.json(db.getFixedExpenses());
+  const { user, isAdmin } = getActiveUserContext(req);
+  const expenses = db.getFixedExpenses();
+  if (!isAdmin && user) {
+    return res.json(filterExpensesForUser(expenses, user));
+  }
+  res.json(expenses);
 });
 
 app.post('/api/faste-utgifter', (req, res) => {
+  const { user, isAdmin } = getActiveUserContext(req);
   const {
     name,
     amountPerMonth,
@@ -451,11 +488,12 @@ app.post('/api/faste-utgifter', (req, res) => {
     return res.status(400).json({ error: 'Oppsigelsestid må være et tall eller tom.' });
   }
 
+  const expenseOwners = isAdmin ? normalizeOwnersInput(owners) : [user?.name].filter(Boolean);
   const expense = db.addFixedExpense({
     name,
     amountPerMonth,
     category: typeof category === 'string' && category.trim() ? category.trim() : 'Annet',
-    owners: normalizeOwnersInput(owners),
+    owners: expenseOwners,
     account: typeof account === 'string' ? account.trim() : '',
     level,
     startDate,
@@ -467,6 +505,7 @@ app.post('/api/faste-utgifter', (req, res) => {
 });
 
 app.post('/api/faste-utgifter/bulk-owners', (req, res) => {
+  if (!enforceAdmin(req, res)) return;
   const owners = normalizeOwnersInput(req.body.owners ?? req.body.owner ?? '');
   if (!owners.length) {
     return res.status(400).json({ error: 'Minst én eier må oppgis.' });
@@ -476,6 +515,7 @@ app.post('/api/faste-utgifter/bulk-owners', (req, res) => {
 });
 
 app.put('/api/faste-utgifter/:id', (req, res) => {
+  const { user, isAdmin, lockEnabled } = getActiveUserContext(req);
   const { id } = req.params;
   const { category, level, noticePeriodMonths, owners, account } = req.body;
   if (level && !FIXED_EXPENSE_LEVELS.includes(level)) {
@@ -499,7 +539,16 @@ app.put('/api/faste-utgifter/:id', (req, res) => {
     }
   }
   if (owners !== undefined) {
-    update.owners = normalizeOwnersInput(owners);
+    update.owners = isAdmin ? normalizeOwnersInput(owners) : [user?.name].filter(Boolean);
+  }
+  const currentExpense = db.getFixedExpenses().find((expense) => String(expense.id) === String(id));
+  if (lockEnabled && !isAdmin && currentExpense) {
+    const allowed = Array.isArray(currentExpense.owners)
+      ? currentExpense.owners.some((owner) => owner && owner.toLowerCase() === user?.name?.toLowerCase())
+      : false;
+    if (!allowed) {
+      return res.status(403).json({ error: 'Du kan bare endre dine egne utgifter.' });
+    }
   }
   const updated = db.updateFixedExpense(id, update);
   if (!updated) return res.status(404).json({ error: 'Fast utgift ikke funnet' });
@@ -514,18 +563,30 @@ app.post('/api/faste-utgifter/:id/reset-price-history', (req, res) => {
 });
 
 app.delete('/api/faste-utgifter/:id', (req, res) => {
+  const { user, isAdmin, lockEnabled } = getActiveUserContext(req);
   const { id } = req.params;
+  if (lockEnabled && !isAdmin) {
+    const currentExpense = db.getFixedExpenses().find((expense) => String(expense.id) === String(id));
+    const allowed = Array.isArray(currentExpense?.owners)
+      ? currentExpense.owners.some((owner) => owner && owner.toLowerCase() === user?.name?.toLowerCase())
+      : false;
+    if (!allowed) {
+      return res.status(403).json({ error: 'Du kan bare slette dine egne utgifter.' });
+    }
+  }
   const deleted = db.deleteFixedExpense(id);
   res.json({ deleted });
 });
 
 app.get('/api/settings', (req, res) => {
+  if (!enforceAdmin(req, res)) return;
   const settings = sanitizeSettings(db.getSettings());
   res.json(settings);
 });
 
 app.put('/api/settings', (req, res) => {
-  const {   
+  if (!enforceAdmin(req, res)) return;
+  const {
     monthlyNetIncome,
     ownerProfiles,
     defaultFixedExpensesOwner,
@@ -732,6 +793,7 @@ app.put('/api/settings', (req, res) => {
 });
 
 app.post('/api/bank-accounts/rename', (req, res) => {
+  if (!enforceAdmin(req, res)) return;
   const from = normalizeName(req.body.from ?? req.body.oldName);
   const to = normalizeName(req.body.to ?? req.body.newName);
 
@@ -768,6 +830,7 @@ app.post('/api/bank-accounts/rename', (req, res) => {
 });
 
 app.get('/api/dashboard', (req, res) => {
+  if (!enforceAdmin(req, res)) return;
   const transactions = db.getTransactions();
   const categories = db.getCategories();
   const pages = db.getPages();
@@ -992,6 +1055,7 @@ app.get('/api/dashboard', (req, res) => {
 });
 
 app.post('/api/owners/rename', (req, res) => {
+  if (!enforceAdmin(req, res)) return;
   const from = normalizeName(req.body.from ?? req.body.oldName);
   const to = normalizeName(req.body.to ?? req.body.newName);
 
@@ -1011,6 +1075,7 @@ app.post('/api/owners/rename', (req, res) => {
 });
 
 app.post('/api/owners/delete', (req, res) => {
+  if (!enforceAdmin(req, res)) return;
   const name = normalizeName(req.body.name ?? req.body.owner);
   if (!name) {
     return res.status(400).json({ error: 'Navn må fylles ut for å fjerne en person.' });
