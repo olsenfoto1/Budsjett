@@ -296,13 +296,22 @@ class Store {
     return this.state.categories;
   }
 
+  getCategoriesForUser(user) {
+    if (!user || user.id === 'admin') {
+      return this.getCategories();
+    }
+    const userId = user.id;
+    return this.state.categories.filter((category) => category.ownerId === userId);
+  }
+
   addCategory(payload) {
     const category = {
       id: payload.id ?? this.nextId('categories'),
       name: payload.name,
       type: payload.type || 'expense',
       color: payload.color || '#4f46e5',
-      description: payload.description || ''
+      description: payload.description || '',
+      ownerId: payload.ownerId || null
     };
     const existingIdx = this.state.categories.findIndex((cat) => cat.id === category.id);
     if (existingIdx >= 0) {
@@ -312,6 +321,12 @@ class Store {
     }
     this.save();
     return category;
+  }
+
+  getCategoryById(id) {
+    const categoryId = Number(id);
+    if (!Number.isFinite(categoryId)) return null;
+    return this.state.categories.find((cat) => cat.id === categoryId) || null;
   }
 
   updateCategory(id, payload) {

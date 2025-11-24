@@ -298,25 +298,43 @@ app.delete('/api/sharing/users/:id', (req, res) => {
 });
 
 app.get('/api/categories', (req, res) => {
-  res.json(db.getCategories());
+  const { user, isAdmin } = getActiveUserContext(req);
+  if (isAdmin) {
+    return res.json(db.getCategories());
+  }
+  res.json(db.getCategoriesForUser(user));
 });
 
 app.post('/api/categories', (req, res) => {
+  const { user, isAdmin } = getActiveUserContext(req);
   const { name, type = 'expense', color = '#4f46e5', description = '' } = req.body;
   if (!name) return res.status(400).json({ error: 'Kategori-navn er påkrevd.' });
-  const category = db.addCategory({ name, type, color, description });
+  const ownerId = isAdmin ? null : user?.id || null;
+  const category = db.addCategory({ name, type, color, description, ownerId });
   res.status(201).json(category);
 });
 
 app.put('/api/categories/:id', (req, res) => {
   const { id } = req.params;
-  const updated = db.updateCategory(id, req.body);
-  if (!updated) return res.status(404).json({ error: 'Kategori ikke funnet' });
+  const { user, isAdmin } = getActiveUserContext(req);
+  const existing = db.getCategoryById(id);
+  if (!existing) return res.status(404).json({ error: 'Kategori ikke funnet' });
+  if (!isAdmin && existing.ownerId !== user?.id) {
+    return res.status(403).json({ error: 'Du har ikke tilgang til denne kategorien.' });
+  }
+  const payload = isAdmin ? req.body : { ...req.body, ownerId: existing.ownerId };
+  const updated = db.updateCategory(id, payload);
   res.json(updated);
 });
 
 app.delete('/api/categories/:id', (req, res) => {
   const { id } = req.params;
+  const { user, isAdmin } = getActiveUserContext(req);
+  const existing = db.getCategoryById(id);
+  if (!existing) return res.status(404).json({ error: 'Kategori ikke funnet' });
+  if (!isAdmin && existing.ownerId !== user?.id) {
+    return res.status(403).json({ error: 'Du har ikke tilgang til denne kategorien.' });
+  }
   const removed = db.deleteCategory(id);
   res.json({ deleted: removed });
 });
