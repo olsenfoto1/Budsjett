@@ -136,6 +136,7 @@ const FixedExpensesPage = () => {
   const [selectedAccounts, setSelectedAccounts] = useState([]);
   const [defaultAccount, setDefaultAccount] = useState('');
   const [hasManualAccountSelection, setHasManualAccountSelection] = useState(false);
+  const [showInsights, setShowInsights] = useState(false);
   const ownerOptions = useMemo(() => {
     const set = new Set();
     expenses.forEach((expense) => {
@@ -1022,121 +1023,145 @@ const FixedExpensesPage = () => {
       )}
       {error && <p className="error-text">{error}</p>}
 
-      <div className="card-grid">
-        <div className="card insight-card glow-lilac">
-          <h3>Totale faste kostnader per måned</h3>
-          <p className="stat">{formatCurrency(contributionAdjustedTotalPerMonth)}</p>
-          <p className="muted">
-            {filteredExpenses.length} aktive avtaler
-            {filtersActive && ` (av ${expenses.length})`}
-            {hiddenCategories.length > 0 && (
-              <>
-                <br />
-                Ekskluderer {hiddenCategories.join(', ')} via kategori-filteret.
-              </>
-            )}
-            {bankModeEnabled && usePersonalIncomeForOwners && activeSharedContributionTotal !== 0 && (
-              <>
-                <br />
-                Inkluderer {formatCurrency(activeSharedContributionTotal)} som
-                {activeSharedContributionTotal > 0 ? ' settes av til' : ' trekkes fra'} felleskontoene.
-              </>
-            )}
-          </p>
-        </div>
-        <div className="card insight-card glow-mint">
-          <h3>Tilgjengelig etter faste kostnader</h3>
-          {!netIncomeLoaded && <p className="muted">Henter netto inntekt…</p>}
-          {netIncomeLoaded && hasIncomeValue && (
-            <>
-              <p className="stat" style={{ color: (freeAfterFixed ?? 0) >= 0 ? '#16a34a' : '#dc2626' }}>
-                {formatCurrency(freeAfterFixed)}
-              </p>
+      <div className={`insights-accordion${showInsights ? ' open' : ''}`}>
+        <button
+          type="button"
+          className="insights-toggle"
+          onClick={() => setShowInsights((prev) => !prev)}
+          aria-expanded={showInsights}
+        >
+          <div className="insights-toggle-text">
+            <p className="muted">Tall og grafer</p>
+            <strong>Statistikk og nøkkeltall</strong>
+          </div>
+          <span className="chevron-icon" aria-hidden="true">
+            {showInsights ? '⌃' : '⌄'}
+          </span>
+        </button>
+
+        {showInsights && (
+          <div className="insights-content">
+            <div className="card-grid">
+              <div className="card insight-card glow-lilac">
+                <h3>Totale faste kostnader per måned</h3>
+                <p className="stat">{formatCurrency(contributionAdjustedTotalPerMonth)}</p>
+                <p className="muted">
+                  {filteredExpenses.length} aktive avtaler
+                  {filtersActive && ` (av ${expenses.length})`}
+                  {hiddenCategories.length > 0 && (
+                    <>
+                      <br />
+                      Ekskluderer {hiddenCategories.join(', ')} via kategori-filteret.
+                    </>
+                  )}
+                  {bankModeEnabled && usePersonalIncomeForOwners && activeSharedContributionTotal !== 0 && (
+                    <>
+                      <br />
+                      Inkluderer {formatCurrency(activeSharedContributionTotal)} som
+                      {activeSharedContributionTotal > 0 ? ' settes av til' : ' trekkes fra'} felleskontoene.
+                    </>
+                  )}
+                </p>
+              </div>
+              <div className="card insight-card glow-mint">
+                <h3>Tilgjengelig etter faste kostnader</h3>
+                {!netIncomeLoaded && <p className="muted">Henter netto inntekt…</p>}
+                {netIncomeLoaded && hasIncomeValue && (
+                  <>
+                    <p
+                      className="stat"
+                      style={{ color: (freeAfterFixed ?? 0) >= 0 ? '#16a34a' : '#dc2626' }}
+                    >
+                      {formatCurrency(freeAfterFixed)}
+                    </p>
+                    <p className="muted">
+                      Basert på {incomeSourceDescription} og {filterDescription}.{bankModeSharedAccountDescription}
+                      {showingDefaultOwnerIncome && ' (Standardvalg fra innstillinger.)'}
+                      {hiddenCategories.length > 0 && ' Viser kun valgte kategorier fra grafen.'}
+                    </p>
+                  </>
+                )}
+                {missingIncomeForOwner && (
+                  <p className="muted">
+                    Legg inn netto inntekt for {missingIncomeOwners.join(', ')} under Innstillinger.
+                  </p>
+                )}
+                {settingsError && <p className="error-text">{settingsError}</p>}
+              </div>
+              <div className="card insight-card glow-amber">
+                <h3>Sum per kategori</h3>
+                <div className="pill-list">
+                  {categoryTotals.length === 0 && <p className="muted">Ingen registrerte utgifter ennå.</p>}
+                  {categoryTotals.length > 0 && visibleCategoryTotals.length === 0 && (
+                    <p className="muted">Ingen kategorier er valgt i grafen akkurat nå.</p>
+                  )}
+                  {visibleCategoryTotals.map((item) => (
+                    <div key={item.category} className="pill-row">
+                      <span>{item.category}</span>
+                      <strong>{formatCurrency(item.total)}</strong>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="card insight-card glow-rose">
+                <h3>Binding utløper snart</h3>
+                {bindingSoon.length === 0 && <p className="muted">Ingen bindinger de neste 90 dagene.</p>}
+                {bindingSoon.map((item) => (
+                  <div key={item.id} className="pill-row">
+                    <span>
+                      <strong>{item.name}</strong>
+                      <br />
+                      <small>{formatDate(item.bindingEndDate)}</small>
+                    </span>
+                    <div style={{ textAlign: 'right' }}>
+                      <span className="badge">{item.daysLeft} dager</span>
+                      <p style={{ margin: '0.2rem 0 0' }}>{formatCurrency(item.amountPerMonth)}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="card insight-card glow-ocean chart-card">
+              <div className="section-header" style={{ marginTop: 0 }}>
+                <h2>Fordeling per kategori</h2>
+                {doughnutData && (
+                  <span className="badge">
+                    {visibleCategoryTotals.length === categoryTotals.length
+                      ? `${categoryTotals.length} kategorier`
+                      : `${visibleCategoryTotals.length}/${categoryTotals.length} kategorier`}
+                  </span>
+                )}
+              </div>
+              {doughnutData ? (
+                <div className="chart-wrapper">
+                  <Doughnut
+                    data={doughnutData}
+                    options={doughnutOptions}
+                  />
+                </div>
+              ) : (
+                <p className="muted">Legg inn utgifter for å se grafen.</p>
+              )}
+            </div>
+
+            <div className="card insight-card glow-sky analysis-card">
+              <h3>Må-ha / Kjekt å ha / Luksus</h3>
+              <div className="analysis-grid">
+                {levelTotals.map((item) => (
+                  <div key={item.level} className="analysis-item">
+                    <span className="muted">{item.level}</span>
+                    <strong>{formatCurrency(item.total)}</strong>
+                  </div>
+                ))}
+              </div>
               <p className="muted">
-                Basert på {incomeSourceDescription} og {filterDescription}.{bankModeSharedAccountDescription}
-                {showingDefaultOwnerIncome && ' (Standardvalg fra innstillinger.)'}
-                {hiddenCategories.length > 0 && ' Viser kun valgte kategorier fra grafen.'}
+                Hvis dere sier opp alle «Luksus»-utgifter sparer dere {formatCurrency(luxuryTotal)} per måned og{' '}
+                {formatCurrency(luxuryTotal * 12)} per år.
               </p>
-            </>
-          )}
-          {missingIncomeForOwner && (
-            <p className="muted">
-              Legg inn netto inntekt for {missingIncomeOwners.join(', ')} under Innstillinger.
-            </p>
-          )}
-          {settingsError && <p className="error-text">{settingsError}</p>}
-        </div>
-        <div className="card insight-card glow-amber">
-          <h3>Sum per kategori</h3>
-          <div className="pill-list">
-            {categoryTotals.length === 0 && <p className="muted">Ingen registrerte utgifter ennå.</p>}
-            {categoryTotals.length > 0 && visibleCategoryTotals.length === 0 && (
-              <p className="muted">Ingen kategorier er valgt i grafen akkurat nå.</p>
-            )}
-            {visibleCategoryTotals.map((item) => (
-              <div key={item.category} className="pill-row">
-                <span>{item.category}</span>
-                <strong>{formatCurrency(item.total)}</strong>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="card insight-card glow-rose">
-          <h3>Binding utløper snart</h3>
-          {bindingSoon.length === 0 && <p className="muted">Ingen bindinger de neste 90 dagene.</p>}
-          {bindingSoon.map((item) => (
-            <div key={item.id} className="pill-row">
-              <span>
-                <strong>{item.name}</strong>
-                <br />
-                <small>{formatDate(item.bindingEndDate)}</small>
-              </span>
-              <div style={{ textAlign: 'right' }}>
-                <span className="badge">{item.daysLeft} dager</span>
-                <p style={{ margin: '0.2rem 0 0' }}>{formatCurrency(item.amountPerMonth)}</p>
-              </div>
             </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="card insight-card glow-ocean chart-card">
-        <div className="section-header" style={{ marginTop: 0 }}>
-          <h2>Fordeling per kategori</h2>
-          {doughnutData && (
-            <span className="badge">
-              {visibleCategoryTotals.length === categoryTotals.length
-                ? `${categoryTotals.length} kategorier`
-                : `${visibleCategoryTotals.length}/${categoryTotals.length} kategorier`}
-            </span>
-          )}
-        </div>
-        {doughnutData ? (
-          <div className="chart-wrapper">
-            <Doughnut
-              data={doughnutData}
-              options={doughnutOptions}
-            />
           </div>
-        ) : (
-          <p className="muted">Legg inn utgifter for å se grafen.</p>
         )}
-      </div>
-
-      <div className="card insight-card glow-sky analysis-card">
-        <h3>Må-ha / Kjekt å ha / Luksus</h3>
-        <div className="analysis-grid">
-          {levelTotals.map((item) => (
-            <div key={item.level} className="analysis-item">
-              <span className="muted">{item.level}</span>
-              <strong>{formatCurrency(item.total)}</strong>
-            </div>
-          ))}
-        </div>
-        <p className="muted">
-          Hvis dere sier opp alle «Luksus»-utgifter sparer dere {formatCurrency(luxuryTotal)} per måned og{' '}
-          {formatCurrency(luxuryTotal * 12)} per år.
-        </p>
       </div>
 
       <div className="section-header">
