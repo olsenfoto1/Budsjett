@@ -104,6 +104,7 @@ const FixedExpensesPage = () => {
   const handleCloseSimulation = useCallback(() => setSimulatedExpense(null), []);
   const [selectedOwners, setSelectedOwners] = useState([]);
   const [hasManualOwnerSelection, setHasManualOwnerSelection] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const [categoryOptions, setCategoryOptions] = useState(FALLBACK_CATEGORY_OPTIONS);
   const [categoryColorMap, setCategoryColorMap] = useState(() => ({ ...FALLBACK_CATEGORY_COLORS }));
   const [categoryError, setCategoryError] = useState('');
@@ -293,6 +294,8 @@ const FixedExpensesPage = () => {
   }, [bankModeEnabled, defaultAccount, hasManualAccountSelection, selectedAccounts]);
 
   const hasAccountFilter = bankModeEnabled && activeAccounts.length > 0;
+  const normalizedSearchTerm = useMemo(() => searchTerm.trim().toLowerCase(), [searchTerm]);
+  const searchActive = normalizedSearchTerm.length > 0;
 
   const filteredExpenses = useMemo(() => {
     const hasOwnerFilter = activeOwners.length > 0;
@@ -303,14 +306,31 @@ const FixedExpensesPage = () => {
       const matchesOwner = !hasOwnerFilter
         || (expense.owners || []).some((owner) => activeOwners.includes(owner));
       const matchesAccount = !hasAccountFilter || activeAccounts.includes(expense.account);
+      const matchesSearch =
+        !normalizedSearchTerm ||
+        [
+          expense.name,
+          expense.category,
+          expense.account,
+          expense.note,
+          ...(Array.isArray(expense.owners) ? expense.owners : [])
+        ]
+          .filter(Boolean)
+          .some((value) => value.toString().toLowerCase().includes(normalizedSearchTerm));
 
       if (hasOwnerFilter && hasAccountFilter) {
-        return matchesOwner || matchesAccount;
+        return (matchesOwner || matchesAccount) && matchesSearch;
       }
 
-      return matchesOwner && matchesAccount;
+      return matchesOwner && matchesAccount && matchesSearch;
     });
-  }, [expenses, activeOwners, activeAccounts, hasAccountFilter]);
+  }, [
+    expenses,
+    activeOwners,
+    activeAccounts,
+    hasAccountFilter,
+    normalizedSearchTerm
+  ]);
 
   const categoryTotals = useMemo(() => {
     const map = new Map();
@@ -660,7 +680,7 @@ const FixedExpensesPage = () => {
       : '';
   const showingDefaultOwnerIncome = !hasManualOwnerSelection && defaultOwners.length > 0;
   const manualFilterActive = hasManualOwnerSelection && activeOwners.length > 0;
-  const filtersActive = manualFilterActive || hasAccountFilter;
+  const filtersActive = manualFilterActive || hasAccountFilter || searchActive;
   const filterLabels = useMemo(() => {
     const labels = [];
     if (manualFilterActive) {
@@ -669,8 +689,18 @@ const FixedExpensesPage = () => {
     if (hasAccountFilter) {
       labels.push(`konto: ${activeAccounts.join(', ')}`);
     }
+    if (searchActive) {
+      labels.push(`søk: ${searchTerm.trim()}`);
+    }
     return labels;
-  }, [activeOwners, activeAccounts, hasAccountFilter, manualFilterActive]);
+  }, [
+    activeOwners,
+    activeAccounts,
+    hasAccountFilter,
+    manualFilterActive,
+    searchActive,
+    searchTerm
+  ]);
 
   const handleOpenForm = (expense) => {
     // Hent alltid siste kategorier når skjemaet åpnes
@@ -753,6 +783,7 @@ const FixedExpensesPage = () => {
     setHasManualOwnerSelection(false);
     setSelectedAccounts([]);
     setHasManualAccountSelection(false);
+    setSearchTerm('');
   }, []);
 
   const handleSubmit = async (event) => {
@@ -1111,6 +1142,25 @@ const FixedExpensesPage = () => {
       <div className="section-header">
         <h2>Alle faste utgifter</h2>
         <div className="section-actions" style={{ gap: '0.75rem' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <label className="muted" htmlFor="expense-search">
+              Søk
+            </label>
+            <input
+              id="expense-search"
+              type="search"
+              inputMode="search"
+              placeholder="Søk etter utgift, kategori eller eier"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              style={{ minWidth: '14rem' }}
+            />
+            {searchTerm && (
+              <button type="button" className="secondary" onClick={() => setSearchTerm('')}>
+                Nullstill
+              </button>
+            )}
+          </div>
           <span>
             {filteredExpenses.length} avtaler
             {filtersActive && ` (av ${expenses.length})`}
