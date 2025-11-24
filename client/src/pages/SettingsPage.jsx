@@ -3,6 +3,8 @@ import { api } from '../api.js';
 
 const SettingsPage = () => {
   const fileRef = useRef(null);
+  const ownerAutoSaveTimeout = useRef(null);
+  const bankAutoSaveTimeout = useRef(null);
   const [exportData, setExportData] = useState(null);
   const [status, setStatus] = useState('');
   const [ownerInputs, setOwnerInputs] = useState({});
@@ -45,6 +47,7 @@ const SettingsPage = () => {
   const [editingBankAccount, setEditingBankAccount] = useState('');
   const [editedBankAccountName, setEditedBankAccountName] = useState('');
   const [bankAccountActionLoading, setBankAccountActionLoading] = useState('');
+  const [settingsReady, setSettingsReady] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -79,6 +82,7 @@ const SettingsPage = () => {
         const accounts = Array.isArray(data.bankAccounts) ? data.bankAccounts : [];
         setBankAccounts(accounts);
         setBankAccountsDraft(accounts);
+        setSettingsReady(true);
       } catch (err) {
         if (!isMounted) return;
         setOwnerError('Kunne ikke hente personer: ' + err.message);
@@ -203,6 +207,8 @@ const SettingsPage = () => {
   };
 
   const handleOwnerIncomeChange = (name, value) => {
+    setOwnerStatus('');
+    setOwnerError('');
     setOwnerInputs((current) => ({
       ...current,
       [name]: { ...(current[name] || {}), income: value }
@@ -210,6 +216,8 @@ const SettingsPage = () => {
   };
 
   const handleOwnerSharedChange = (name, value) => {
+    setOwnerStatus('');
+    setOwnerError('');
     setOwnerInputs((current) => ({
       ...current,
       [name]: { ...(current[name] || {}), shared: value }
@@ -217,6 +225,8 @@ const SettingsPage = () => {
   };
 
   const handleOwnerBankContributionChange = (name, account, value) => {
+    setOwnerStatus('');
+    setOwnerError('');
     setOwnerInputs((current) => {
       const existing = current[name] || {};
       const contributions = { ...(existing.bankContributions || {}) };
@@ -254,8 +264,9 @@ const SettingsPage = () => {
     }
   };
 
-  const handleSaveBankAccounts = async () => {
-    setBankAccountStatus('');
+  const handleSaveBankAccounts = useCallback(async () => {
+    if (!settingsReady) return;
+    setBankAccountStatus('Lagrer endringer…');
     setBankAccountError('');
     setIsSavingBankAccounts(true);
     setBankAccountActionLoading('');
@@ -268,13 +279,13 @@ const SettingsPage = () => {
       setBankAccounts(nextAccounts);
       setBankAccountsDraft(nextAccounts);
       syncOwnerBankContributions(nextAccounts);
-      setBankAccountStatus('Bankkontoer oppdatert.');
+      setBankAccountStatus('Endringene ble lagret automatisk.');
     } catch (err) {
       setBankAccountError(err.message || 'Kunne ikke oppdatere kontoer.');
     } finally {
       setIsSavingBankAccounts(false);
     }
-  };
+  }, [bankAccountsDraft, settingsReady, syncOwnerBankContributions]);
 
   const handleStartRenameBankAccount = (account) => {
     setBankAccountStatus('');
@@ -389,14 +400,13 @@ const SettingsPage = () => {
     setNewOwnerName('');
   };
 
-  const handleSaveOwners = async () => {
-    setOwnerStatus('');
+  const handleSaveOwners = useCallback(async () => {
+    if (!settingsReady) return;
+    setOwnerStatus('Lagrer endringer…');
     setOwnerError('');
     setIsSavingOwners(true);
     try {
-      const activeBankAccounts = bankModeEnabled
-        ? (bankAccounts.length > 0 ? bankAccounts : bankAccountsDraft)
-        : [];
+      const activeBankAccounts = bankModeEnabled ? bankAccountsDraft : [];
       const payload = Object.entries(ownerInputs)
         .filter(([name]) => name.trim())
         .filter(([, value]) => {
@@ -447,13 +457,13 @@ const SettingsPage = () => {
         });
       const updated = await api.updateSettings({ ownerProfiles: payload });
       syncOwnersFromPayload(updated);
-      setOwnerStatus('Lagret personlige inntekter.');
+      setOwnerStatus('Endringene ble lagret automatisk.');
     } catch (err) {
       setOwnerError(err.message || 'Kunne ikke lagre inntekter.');
     } finally {
       setIsSavingOwners(false);
     }
-  };
+  }, [bankAccountsDraft, bankModeEnabled, ownerInputs, settingsReady, syncOwnersFromPayload]);
 
   const handleStartRenameOwner = (name) => {
     setOwnerStatus('');
@@ -722,13 +732,43 @@ const SettingsPage = () => {
     }
   };
 
+  useEffect(() => {
+    if (!settingsReady) return undefined;
+    if (bankAutoSaveTimeout.current) {
+      clearTimeout(bankAutoSaveTimeout.current);
+    }
+    bankAutoSaveTimeout.current = setTimeout(() => {
+      handleSaveBankAccounts();
+    }, 800);
+    return () => {
+      if (bankAutoSaveTimeout.current) {
+        clearTimeout(bankAutoSaveTimeout.current);
+      }
+    };
+  }, [bankAccountsDraft, handleSaveBankAccounts, settingsReady]);
+
+  useEffect(() => {
+    if (!settingsReady) return undefined;
+    if (ownerAutoSaveTimeout.current) {
+      clearTimeout(ownerAutoSaveTimeout.current);
+    }
+    ownerAutoSaveTimeout.current = setTimeout(() => {
+      handleSaveOwners();
+    }, 900);
+    return () => {
+      if (ownerAutoSaveTimeout.current) {
+        clearTimeout(ownerAutoSaveTimeout.current);
+      }
+    };
+  }, [bankAccountsDraft, bankModeEnabled, handleSaveOwners, ownerInputs, settingsReady]);
+
   return (
     <div className="settings-page">
       <div className="section-header">
         <h2>Innstillinger</h2>
         <p className="muted">Administrer sikkerhetskopier, importer data og oppdater personoppsettet på ett sted.</p>
       </div>
-      <div className="card-grid settings-stack">
+      <div className="settings-stack">
         <section className="card settings-card">
           <div className="settings-card-header">
             <div>
@@ -988,15 +1028,13 @@ const SettingsPage = () => {
                     Legg til konto
                   </button>
                 </form>
-                <div className="settings-actions">
-                  <button
-                    type="button"
-                    onClick={handleSaveBankAccounts}
-                    className="save-owner-button"
-                    disabled={isSavingBankAccounts}
-                  >
-                    {isSavingBankAccounts ? 'Lagrer…' : 'Lagre kontoer'}
-                  </button>
+                <div className="settings-actions space-between">
+                  <p className="muted auto-save-hint">
+                    {isSavingBankAccounts ? 'Lagrer automatisk…' : 'Endringer lagres automatisk'}
+                  </p>
+                  {bankAccountStatus && !isSavingBankAccounts && (
+                    <span className="settings-status-inline success">{bankAccountStatus}</span>
+                  )}
                 </div>
               </div>
             </div>
@@ -1307,14 +1345,15 @@ const SettingsPage = () => {
               />
               <button type="submit">Legg til</button>
             </form>
-            <button
-              type="button"
-              onClick={handleSaveOwners}
-              disabled={isSavingOwners}
-              className="save-owner-button"
-            >
-              {isSavingOwners ? 'Lagrer…' : 'Lagre personlige inntekter'}
-            </button>
+            <div className="auto-save-banner">
+              <p className="muted">
+                {isSavingOwners ? 'Lagrer endringer automatisk…' : 'Personer og beløp lagres automatisk'}
+              </p>
+              {ownerStatus && !isSavingOwners && (
+                <span className="settings-status-inline success">{ownerStatus}</span>
+              )}
+              {ownerError && <p className="error-text">{ownerError}</p>}
+            </div>
           </div>
         </section>
       </div>
